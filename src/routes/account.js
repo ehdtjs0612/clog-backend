@@ -96,7 +96,7 @@ router.put("/", loginAuth, async (req, res, next) => {
 });
 
 // 회원 탈퇴
-router.delete("/", loginAuth, async (req,res,next) => {
+router.delete("/", loginAuth, async (req, res, next) => {
     const result = {
         message: "" | null,
         data: {}
@@ -119,7 +119,7 @@ router.delete("/", loginAuth, async (req,res,next) => {
 });
 
 // 비밀번호 재설정
-router.put("/pw", loginAuth, async (req, res, next) => {
+router.put("/pw", async (req, res, next) => {
     const { email, newPw } = req.body
     const result = {
         message: "" | null,
@@ -134,6 +134,34 @@ router.put("/pw", loginAuth, async (req, res, next) => {
 
         const sql = `UPDATE account_tb SET pw = $1 WHERE email = $2 `;
         const params = [hashedPassword, email];
+        const data = await pool.query(sql, params);
+
+        if (data.rowCount !== 0) {
+            result.message = "비밀번호 재설정 완료";
+            result.data = data.rows[0]
+        }
+
+        res.send(result);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 비밀번호 재설정 (로그인 한 상태에서)
+router.put("/loged-in/pw", loginAuth, async (req, res, next) => {
+    const { newPw } = req.body
+    const result = {
+        message: "" | null,
+        data: {}
+    };
+
+    try {
+        validate(newPw, "newPw").checkInput().checkPwRegex();
+
+        const hashedPassword = await bcryptUtil.hashing(newPw);
+
+        const sql = `UPDATE account_tb SET pw = $1 WHERE id = $2 `;
+        const params = [hashedPassword, req.decoded.id];
         const data = await pool.query(sql, params);
 
         if (data.rowCount !== 0) {
