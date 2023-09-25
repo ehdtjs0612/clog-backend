@@ -9,7 +9,7 @@ const accountApi = require("./routes/account");
 const authApi = require("./routes/auth");
 const errorHandling = require("./middleware/errorHandling");
 
-redisClient.connect();
+// redisClient.connect();
 
 app.use(express.json());
 app.use(cookieParser());

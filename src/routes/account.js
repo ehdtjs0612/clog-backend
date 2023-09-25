@@ -3,8 +3,10 @@ const router = require("express").Router();
 const validate = require("../module/validation");
 const bcryptUtil = require("../module/bcrypt");
 const { BadRequestException } = require("../module/customError");
+const personalColor = require("../module/personalColor");
+const loginAuth = require("../middleware/loginAuth");
 
-// personal color 만드는 헬퍼함수 module에 분리시켜서 회원가입 성공 시 params 마지막 인자에 넣어주면 감사하겠습ㄴ
+// 회원가입
 router.post("/", async (req, res, next) => {
     const { email, pw, name, major, entryYear } = req.body;
     const result = {
@@ -26,7 +28,7 @@ router.post("/", async (req, res, next) => {
                         account_TB (major, email, pw, name, entry_year, personal_color)
                         VALUES ($1, $2, $3, $4, $5, $6)`;
 
-        const params = [major, email, hashedPassword, name, entryYear, "111111"];
+        const params = [major, email, hashedPassword, name, entryYear, personalColor()];
         const data = await pool.query(sql, params);
         if (data.rowCount !== 0) {
             result.message = "회원가입 성공";
@@ -41,5 +43,109 @@ router.post("/", async (req, res, next) => {
         next(error);
     }
 });
+
+// 프로필 조회
+router.get("/", loginAuth, async (req, res, next) => {
+    const result = {
+        message: "" | null,
+        data: {}
+    }
+
+    try {
+        const sql = `SELECT name, personal_color AS "personalColor", major, entry_year AS "entryYear", created_at AS "createdAt" from account_tb WHERE id = $1`;
+        const params = [req.decoded.id];
+        const data = await pool.query(sql, params);
+
+        if (data.rowCount !== 0) {
+            result.message = "프로필 조회 성공";
+            result.data = data.rows[0]
+        }
+        console.log(result)
+        res.send(result);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 계정정보 수정
+router.put("/", loginAuth, async (req, res, next) => {
+    const { name, entryYear, major } = req.body;
+    const result = {
+        message: "" | null,
+        data: {}
+    }
+
+    try {
+        validate(name, "name").checkInput().checkNameRegex();
+        validate(major, "major").checkInput().isNumber();
+        validate(entryYear, "entryYear").checkInput().isNumber();
+
+        const sql = `UPDATE account_tb SET name = $1, "entry_year" = $2, major = $3 WHERE id = $4`;
+        const params = [name, entryYear, major, req.decoded.id];
+        const data = await pool.query(sql, params);
+
+        if (data.rowCount =! 0) {
+            result.message = "계정정보 수정 성공";
+            result.data = data.rows[0]
+        }
+
+        res.send(result)
+    } catch (error) {
+        next(error)
+    }
+});
+
+// 회원 탈퇴
+router.delete("/", loginAuth, async (req,res,next) => {
+    const result = {
+        message: "" | null,
+        data: {}
+    }
+
+    try {
+        const sql = `DELETE FROM account_tb WHERE id = $1`;
+        const params = [req.decoded.id];
+        const data = await pool.query(sql, params);
+
+        if (data.rowCount !== 0) {
+            result.message = "계정 삭제 성공";
+            result.data = data.rows[0]
+        }
+
+        res.send(result);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 비밀번호 재설정
+router.put("/pw", loginAuth, async (req, res, next) => {
+    const { email, newPw } = req.body
+    const result = {
+        message: "" | null,
+        data: {}
+    };
+
+    try {
+        validate(email, "email").checkInput().checkEmailRegex();
+        validate(newPw, "newPw").checkInput().checkPwRegex();
+
+        const hashedPassword = await bcryptUtil.hashing(newPw);
+
+        const sql = `UPDATE account_tb SET pw = $1 WHERE email = $2 `;
+        const params = [hashedPassword, email];
+        const data = await pool.query(sql, params);
+
+        if (data.rowCount !== 0) {
+            result.message = "비밀번호 재설정 완료";
+            result.data = data.rows[0]
+        }
+
+        res.send(result);
+    } catch (error) {
+        next(error);
+    }
+});
+
 
 module.exports = router;
