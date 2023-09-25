@@ -9,7 +9,7 @@ const accountApi = require("./routes/account");
 const authApi = require("./routes/auth");
 const errorHandling = require("./middleware/errorHandling");
 
-// connect redis
+// connect redis client
 redisClient.connect();
 
 // global middleware
