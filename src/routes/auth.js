@@ -6,6 +6,7 @@ const bcryptUtil = require("../module/bcrypt");
 const jwtUtil = require("../module/jwt");
 const { BadRequestException } = require('../module/customError');
 const emailHandler = require("../module/emailHandler");
+const redisClient = require("../../config/database/redis");
 
 router.post("/login", async (req, res, next) => {
     const { email, pw } = req.body;
@@ -21,7 +22,7 @@ router.post("/login", async (req, res, next) => {
         const sql = "SELECT id, pw FROM account_TB WHERE email = $1";
         const params = [email];
         const data = await pool.query(sql, params);
-        if (data.rows.length !== 0) {
+        if (data.rowCount !== 0) {
             const userData = data.rows[0];
             // 입력받은 pw와 암호화된 pw가 일치할경우 accessToken 발급
             const passwordMatch = await bcryptUtil.compare(pw, userData.pw);
@@ -91,11 +92,41 @@ router.post("/send-code", async (req, res, next) => {
     }
 
     try {
-        validate(email, "email").checkInput().checkEmailRegex();
+        // validate(email, "email").checkInput().checkEmailRegex();
         emailHandler.sendVerifyEmail(email);
 
         result.message = "인증번호 전송 완료";
         res.send(result);
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.post("/signup/verify-email", async (req, res, next) => {
+    const { email, code } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    }
+
+    try {
+        validate(email, "email").checkInput().checkEmailRegex();
+        validate(code, "code").checkInput().isNumber().checkLength(5, 5);
+
+        const data = await redisClient.get(email);
+        // redis에 이메일이 존재하지 않는 경우
+        if (!data) {
+            throw new BadRequestException("인증번호를 요청한 이메일이 존재하지 않습니다");
+        }
+        // 인증번호가 유효하지 않은 경우
+        if (data !== code) {
+            throw new BadRequestException("인증번호가 올바르지 않습니다");
+        }
+        // 인증번호가 유효한 경우
+        result.message = "인증이 완료되었습니다";
+        await redisClient.del(email);
+        return res.send(result);
+
     } catch (error) {
         next(error);
     }
