@@ -5,7 +5,7 @@ const { maxEmailLength, maxPwLength } = require("../module/global");
 const bcryptUtil = require("../module/bcrypt");
 const jwtUtil = require("../module/jwt");
 const { BadRequestException } = require('../module/customError');
-const redisClient = require("../../config/database/redis");
+const emailHandler = require("../module/emailHandler");
 
 router.post("/login", async (req, res, next) => {
     const { email, pw } = req.body;
@@ -84,6 +84,21 @@ router.get("/duplicate/email/:email", async (req, res, next) => {
 });
 
 router.post("/send-code", async (req, res, next) => {
+    const { email } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    }
+
+    try {
+        validate(email, "email").checkInput().checkEmailRegex();
+        emailHandler.sendVerifyEmail(email);
+
+        result.message = "인증번호 전송 완료";
+        res.send(result);
+    } catch (error) {
+        next(error);
+    }
 });
 
 module.exports = router;
