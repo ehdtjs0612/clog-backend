@@ -132,4 +132,44 @@ router.post("/signup/verify-email", async (req, res, next) => {
     }
 });
 
+router.post("/reset-pw/verify-email", async (req, res, next) => {
+    const { email, code } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    }
+
+    try {
+        // validate(email, "email").checkInput().checkEmailRegex();
+        validate(code, "code").checkInput().isNumber().checkLength(5, 5);
+
+        const savedVerifyCode = await redisClient.get(email);
+        // redis에 이메일이 존재하지 않는 경우
+        if (!savedVerifyCode) {
+            throw new BadRequestException("인증번호를 요청한 이메일이 존재하지 않습니다");
+        }
+        // 인증번호가 유효하지 않은 경우
+        if (savedVerifyCode !== code) {
+            throw new BadRequestException("인증번호가 올바르지 않습니다");
+        }
+        // 인증번호가 유효한 경우 해당 이메일을 가진 유저를 조회
+        const findUserSql = "SELECT id FROM account_tb WHERE email = $1";
+        const params = [email];
+        const userData = await pool.query(findUserSql, params);
+
+        if (userData.rowCount === 0) {
+            throw new BadRequestException("해당하는 사용자가 존재하지 않습니다");
+        }
+        const userPk = userData.rows[0].id;
+        result.message = "인증이 완료되었습니다";
+        result.data.userId = userPk;
+
+        await redisClient.del(email);
+        return res.send(result);
+
+    } catch (error) {
+        next(error);
+    }
+});
+
 module.exports = router;
