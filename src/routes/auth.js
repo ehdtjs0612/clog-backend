@@ -1,12 +1,18 @@
 const pool = require("../../config/database/postgresql");
 const router = require("express").Router();
 const validate = require("../module/validation");
-const { maxEmailLength, maxPwLength } = require("../module/global");
+const {
+    maxEmailLength,
+    maxPwLength,
+    certifiedLength: certifiedNumberLength
+} = require("../module/global");
 const bcryptUtil = require("../module/bcrypt");
 const jwtUtil = require("../module/jwt");
 const { BadRequestException } = require('../module/customError');
 const emailHandler = require("../module/emailHandler");
+const redisClient = require("../../config/database/redis");
 
+// 로그인 api
 router.post("/login", async (req, res, next) => {
     const { email, pw } = req.body;
     const result = {
@@ -21,7 +27,7 @@ router.post("/login", async (req, res, next) => {
         const sql = "SELECT id, pw FROM account_TB WHERE email = $1";
         const params = [email];
         const data = await pool.query(sql, params);
-        if (data.rows.length !== 0) {
+        if (data.rowCount !== 0) {
             const userData = data.rows[0];
             // 입력받은 pw와 암호화된 pw가 일치할경우 accessToken 발급
             const passwordMatch = await bcryptUtil.compare(pw, userData.pw);
@@ -42,6 +48,7 @@ router.post("/login", async (req, res, next) => {
     }
 });
 
+// 로그아웃 api
 router.post("/logout", (req, res, next) => {
     const result = {
         message: "",
@@ -57,6 +64,7 @@ router.post("/logout", (req, res, next) => {
     }
 });
 
+// 이메일 중복 체크 api
 router.get("/duplicate/email/:email", async (req, res, next) => {
     const result = {
         message: "",
@@ -83,6 +91,7 @@ router.get("/duplicate/email/:email", async (req, res, next) => {
     }
 });
 
+// 이메일 인증번호 전송 api
 router.post("/send-code", async (req, res, next) => {
     const { email } = req.body;
     const result = {
@@ -91,11 +100,83 @@ router.post("/send-code", async (req, res, next) => {
     }
 
     try {
-        validate(email, "email").checkInput().checkEmailRegex();
+        // validate(email, "email").checkInput().checkEmailRegex();
         emailHandler.sendVerifyEmail(email);
 
         result.message = "인증번호 전송 완료";
         res.send(result);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 회원가입을 위한 이메일 인증 api
+router.post("/signup/verify-email", async (req, res, next) => {
+    const { email, code } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    }
+
+    try {
+        validate(email, "email").checkInput().checkEmailRegex();
+        validate(code, "code").checkInput().isNumber().checkLength(certifiedNumberLength, certifiedNumberLength);
+
+        const data = await redisClient.get(email);
+        // redis에 이메일이 존재하지 않는 경우
+        if (!data) {
+            throw new BadRequestException("인증번호를 요청한 이메일이 존재하지 않습니다");
+        }
+        // 인증번호가 유효하지 않은 경우
+        if (data !== code) {
+            throw new BadRequestException("인증번호가 올바르지 않습니다");
+        }
+        // 인증번호가 유효한 경우
+        result.message = "인증이 완료되었습니다";
+        await redisClient.del(email);
+        return res.send(result);
+
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 비밀번호 재설정을 위한 이메일 인증 api
+router.post("/reset-pw/verify-email", async (req, res, next) => {
+    const { email, code } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    }
+
+    try {
+        // validate(email, "email").checkInput().checkEmailRegex();
+        validate(code, "code").checkInput().isNumber().checkLength(certifiedNumberLength, certifiedNumberLength);
+
+        const savedVerifyCode = await redisClient.get(email);
+        // redis에 이메일이 존재하지 않는 경우
+        if (!savedVerifyCode) {
+            throw new BadRequestException("인증번호를 요청한 이메일이 존재하지 않습니다");
+        }
+        // 인증번호가 유효하지 않은 경우
+        if (savedVerifyCode !== code) {
+            throw new BadRequestException("인증번호가 올바르지 않습니다");
+        }
+        // 인증번호가 유효한 경우 해당 이메일을 가진 유저를 조회
+        const findUserSql = "SELECT id FROM account_tb WHERE email = $1";
+        const params = [email];
+        const userData = await pool.query(findUserSql, params);
+
+        if (userData.rowCount === 0) {
+            throw new BadRequestException("해당하는 사용자가 존재하지 않습니다");
+        }
+        const userPk = userData.rows[0].id;
+        result.message = "인증이 완료되었습니다";
+        result.data.userId = userPk;
+
+        await redisClient.del(email);
+        return res.send(result);
+
     } catch (error) {
         next(error);
     }
