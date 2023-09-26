@@ -1,13 +1,18 @@
 const pool = require("../../config/database/postgresql");
 const router = require("express").Router();
 const validate = require("../module/validation");
-const { maxEmailLength, maxPwLength } = require("../module/global");
+const {
+    maxEmailLength,
+    maxPwLength,
+    certifiedLength: certifiedNumberLength
+} = require("../module/global");
 const bcryptUtil = require("../module/bcrypt");
 const jwtUtil = require("../module/jwt");
 const { BadRequestException } = require('../module/customError');
 const emailHandler = require("../module/emailHandler");
 const redisClient = require("../../config/database/redis");
 
+// 로그인 api
 router.post("/login", async (req, res, next) => {
     const { email, pw } = req.body;
     const result = {
@@ -43,6 +48,7 @@ router.post("/login", async (req, res, next) => {
     }
 });
 
+// 로그아웃 api
 router.post("/logout", (req, res, next) => {
     const result = {
         message: "",
@@ -58,6 +64,7 @@ router.post("/logout", (req, res, next) => {
     }
 });
 
+// 이메일 중복 체크 api
 router.get("/duplicate/email/:email", async (req, res, next) => {
     const result = {
         message: "",
@@ -84,6 +91,7 @@ router.get("/duplicate/email/:email", async (req, res, next) => {
     }
 });
 
+// 이메일 인증번호 전송 api
 router.post("/send-code", async (req, res, next) => {
     const { email } = req.body;
     const result = {
@@ -102,6 +110,7 @@ router.post("/send-code", async (req, res, next) => {
     }
 });
 
+// 회원가입을 위한 이메일 인증 api
 router.post("/signup/verify-email", async (req, res, next) => {
     const { email, code } = req.body;
     const result = {
@@ -111,7 +120,7 @@ router.post("/signup/verify-email", async (req, res, next) => {
 
     try {
         validate(email, "email").checkInput().checkEmailRegex();
-        validate(code, "code").checkInput().isNumber().checkLength(5, 5);
+        validate(code, "code").checkInput().isNumber().checkLength(certifiedNumberLength, certifiedNumberLength);
 
         const data = await redisClient.get(email);
         // redis에 이메일이 존재하지 않는 경우
@@ -132,6 +141,7 @@ router.post("/signup/verify-email", async (req, res, next) => {
     }
 });
 
+// 비밀번호 재설정을 위한 이메일 인증 api
 router.post("/reset-pw/verify-email", async (req, res, next) => {
     const { email, code } = req.body;
     const result = {
@@ -141,7 +151,7 @@ router.post("/reset-pw/verify-email", async (req, res, next) => {
 
     try {
         // validate(email, "email").checkInput().checkEmailRegex();
-        validate(code, "code").checkInput().isNumber().checkLength(5, 5);
+        validate(code, "code").checkInput().isNumber().checkLength(certifiedNumberLength, certifiedNumberLength);
 
         const savedVerifyCode = await redisClient.get(email);
         // redis에 이메일이 존재하지 않는 경우
