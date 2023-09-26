@@ -1,7 +1,11 @@
 const pool = require("../../config/database/postgresql");
 const router = require("express").Router();
 const validate = require("../module/validation");
-const { maxEmailLength, maxPwLength } = require("../module/global");
+const {
+    maxEmailLength,
+    maxPwLength,
+    certifiedLength: certifiedNumberLength
+} = require("../module/global");
 const bcryptUtil = require("../module/bcrypt");
 const jwtUtil = require("../module/jwt");
 const { BadRequestException } = require('../module/customError');
@@ -116,7 +120,7 @@ router.post("/signup/verify-email", async (req, res, next) => {
 
     try {
         validate(email, "email").checkInput().checkEmailRegex();
-        validate(code, "code").checkInput().isNumber().checkLength(5, 5);
+        validate(code, "code").checkInput().isNumber().checkLength(certifiedNumberLength, certifiedNumberLength);
 
         const data = await redisClient.get(email);
         // redis에 이메일이 존재하지 않는 경우
@@ -147,7 +151,7 @@ router.post("/reset-pw/verify-email", async (req, res, next) => {
 
     try {
         // validate(email, "email").checkInput().checkEmailRegex();
-        validate(code, "code").checkInput().isNumber().checkLength(5, 5);
+        validate(code, "code").checkInput().isNumber().checkLength(certifiedNumberLength, certifiedNumberLength);
 
         const savedVerifyCode = await redisClient.get(email);
         // redis에 이메일이 존재하지 않는 경우
