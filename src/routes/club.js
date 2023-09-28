@@ -3,6 +3,7 @@ const router = require("express").Router();
 const pool = require("../../config/database/postgresql");
 const validate = require('../module/validation');
 const mapping = require("../module/mapping");
+const { BadRequestException } = require('../module/customError');
 
 // 동아리 생성 api
 router.post("/", async (req, res, next) => {
@@ -72,6 +73,38 @@ router.post("/", async (req, res, next) => {
         if (pgClient) {
             pgClient.release();
         }
+    }
+});
+
+// 동아리 프로필 조회 api
+router.get("/:clubId/profile", async (req, res, next) => {
+    const { clubId } = req.params;
+    const result = {
+        message: "",
+        data: {}
+    }
+    try {
+        validate(clubId, "clubId").checkInput().isNumber().checkLength(1, 5);
+
+        const selectedClubSql = `SELECT club_tb.name AS name, belong_tb.name AS belong, big_category_tb.name AS bigCategory, small_category_tb.name AS smallCategory, club_tb.profile_img AS profileImage, club_tb.cover AS cover, club_tb.created_at AS createdAt
+                                        FROM club_tb
+                                        JOIN belong_tb ON club_tb.id = belong_tb.club_id
+                                        JOIN big_category_tb ON club_tb.id = big_category_tb.club_id
+                                        JOIN small_category_tb ON club_tb.id = small_category_tb.club_id
+                                        WHERE club_tb.id = $1`
+        const selectedClubParams = [clubId];
+
+        const clubProfiledata = await pool.query(selectedClubSql, selectedClubParams);
+        if (clubProfiledata.rowCount === 0) {
+            throw new BadRequestException("해당하는 동아리가 존재하지 않습니다");
+        }
+        result.data = {
+            club: clubProfiledata.rows
+        }
+        res.send(result);
+
+    } catch (error) {
+        next(error);
     }
 });
 
