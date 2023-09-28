@@ -8,6 +8,8 @@ const redisClient = require("../config/database/redis");
 const accountApi = require("./routes/account");
 const authApi = require("./routes/auth");
 const uploadApi = require("./routes/upload");
+const clubApi = require("./routes/club");
+
 const errorHandling = require("./middleware/errorHandling");
 
 // connect redis client
@@ -21,6 +23,7 @@ app.use(cookieParser());
 app.use("/account", accountApi);
 app.use("/auth", authApi);
 app.use("/upload", uploadApi);
+app.use("/club", clubApi);
 
 // error handling muddleware
 app.use(errorHandling());
