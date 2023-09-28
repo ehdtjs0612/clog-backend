@@ -37,7 +37,7 @@ router.post("/", async (req, res, next) => {
         res.send(result);
 
     } catch (error) {
-        if (error.code === '23505' && error.constraint === 'unique_email') {
+        if (error.code === '23505') {
             return next(new BadRequestException("중복된 이메일이 존재합니다"));
         }
         next(error);
@@ -84,7 +84,7 @@ router.put("/", loginAuth, async (req, res, next) => {
         const params = [name, entryYear, major, req.decoded.id];
         const data = await pool.query(sql, params);
 
-        if (data.rowCount =! 0) {
+        if (data.rowCount = !0) {
             result.message = "계정정보 수정 성공";
             result.data = data.rows[0]
         }
