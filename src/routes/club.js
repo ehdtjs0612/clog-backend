@@ -6,12 +6,23 @@ const mapping = require("../module/mapping");
 
 // 동아리 생성 api
 router.post("/", async (req, res, next) => {
+    const result = {
+        message: "",
+        data: {}
+    }
     const {
         name, belong, bigCategory, smallCategory, cover, isAllowJoin, themeColor, bannerImg, profileImg
     } = req.body;
     let pgClient = null;
 
     try {
+        validate(name, "name").checkInput().checkClubNameRegex();
+        validate(cover, "cover").checkInput().checkLength(0, 500);
+        validate(isAllowJoin, "isAllowJoin").checkInput().isBoolean();
+        validate(themeColor, "themeColor").checkInput().checkThemeColorRegex();
+        validate(belong, "belong").checkInput().isNumber().checkLength(1, 5);
+        validate(bigCategory, "bigCategory").checkInput().isNumber().checkLength(1, 5);
+        validate(smallCategory, "smallCategory").checkInput().isNumber().checkLength(1, 5);
 
         // 받아온 데이터 (소속, 대분류, 소분류) 매핑
         const convertedBelong = mapping.getBelong(belong);
@@ -44,15 +55,19 @@ router.post("/", async (req, res, next) => {
         await pgClient.query(insertSmallCategoryQuery, insertSmallCategoryParam);
         // 트랜잭션 커밋
         pgClient.query("COMMIT");
-        res.send({
-            message: "성공"
-        });
+
+        result.message = "동아리 생성 성공";
+        result.data = {
+            "clubId": createdClubId
+        }
+        res.send(result);
 
     } catch (error) {
         if (pgClient) {
             await pgClient.query("ROLLBACK");
         }
         next(error);
+
     } finally {
         if (pgClient) {
             pgClient.release();
