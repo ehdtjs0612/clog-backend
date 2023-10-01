@@ -30,7 +30,7 @@ router.post("/login", async (req, res, next) => {
         if (data.rowCount !== 0) {
             const userData = data.rows[0];
             // 입력받은 pw와 암호화된 pw가 일치할경우 accessToken 발급
-            const passwordMatch = await bcryptUtil.compare(pw, userData.pw);
+            const passwordMatch = bcryptUtil.compare(pw, userData.pw);
             if (passwordMatch) {
                 const accessToken = await jwtUtil.userSign(userData);
                 res.cookie("accessToken", accessToken, {
