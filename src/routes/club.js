@@ -120,4 +120,45 @@ router.get("/:clubId/profile", async (req, res, next) => {
     }
 });
 
+// 동아리 관리자 페이지 (동아리 프로필)api
+router.get("/:clubId/manage", loginAuth, managerAuth, async (req, res, next) => {
+});
+
+// 동아리 수정 api
+router.put("/", loginAuth, managerAuth, async (req, res, next) => {
+    const {
+        name, cover, isAllowJoin, themeColor, bannerImg, profileImg
+    } = req.body;
+    const { clubId } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(name, "name").checkInput().checkClubNameRegex();
+        validate(cover, "cover").checkInput().checkLength(1, maxClubCoverLength);
+        validate(isAllowJoin, "isAllowJoin").checkInput().isBoolean();
+        validate(themeColor, "themeColor").checkInput().checkThemeColorRegex();
+        validate(bannerImg, "bannerImg").checkInput().checkLength(1, maxBannerImageLength);
+        validate(profileImg, "profileImg").checkInput().checkLength(1, maxProfileImageLength);
+
+        const modifyClubProfileSql = `UPDATE club_tb 
+                                            SET name = $1, cover = $2, is_recruit = $3, theme_color = $4, banner_img = $5, profile_img = $6 
+                                            WHERE id = $7`;
+        const modifyClubProfileParam = [
+            name, cover, isAllowJoin, themeColor, bannerImg, profileImg,
+            clubId
+        ];
+        const modifyClubProfileData = await pool.query(modifyClubProfileSql, modifyClubProfileParam);
+        if (modifyClubProfileData.rowCount !== 0) {
+            result.message = "수정 성공";
+            return res.send(result);
+        }
+
+    } catch (error) {
+        next(error);
+    }
+});
+
 module.exports = router;
