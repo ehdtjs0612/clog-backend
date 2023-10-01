@@ -1,10 +1,11 @@
-const { pwRegex, nameRegex, emailRegex } = require("../module/regex");
+const { pwRegex, nameRegex, emailRegex, clubNameRegex, themeColorRegex } = require("../module/regex");
 const { BadRequestException } = require("../module/customError");
 const errorMessage = {
     invalidInput: "요청값이 잘못되었습니다",
     length: "길이가 비정상적입니다",
     regex: "정규표현식 실패",
     isNumber: "정수가 아닙니다",
+    isBoolean: "true or false만 가능합니다"
 }
 
 function Validation(input, name) {
@@ -28,6 +29,16 @@ function Validation(input, name) {
         return this;
     }
 
+    this.checkClubNameRegex = () => {
+        if (!clubNameRegex.test(input)) this.setError(errorMessage.regex);
+        return this;
+    }
+
+    this.checkThemeColorRegex = () => {
+        if (!themeColorRegex.test(input)) this.setError(errorMessage.regex);
+        return this;
+    }
+
     this.checkEmailRegex = () => {
         if (!emailRegex.test(input)) this.setError(errorMessage.regex);
         return this;
@@ -35,6 +46,11 @@ function Validation(input, name) {
 
     this.isNumber = () => {
         if (isNaN(Number(input))) this.setError(errorMessage.isNumber);
+        return this;
+    }
+
+    this.isBoolean = () => {
+        if (typeof input !== 'boolean') this.setError(errorMessage.isBoolean);
         return this;
     }
 

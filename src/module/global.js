@@ -7,6 +7,21 @@ module.exports = {
     certifiedLength: 5,
     certifiedExpireTime: 180,
 
+    // club
+    maxClubCoverLength: 500,
+    maxClubBelongLength: 5,
+    maxClubBigCategoryLength: 5,
+    maxClubSmallCategoryLength: 5,
+    maxBannerImageLength: 20000,
+    maxProfileImageLength: 20000,
+
+    // position
+    position: {
+        president: 0,
+        manager: 1,
+        member: 2
+    },
+
     // notification url
     club_comment_url : "/comment",
     club_reply_url : "/reply",
