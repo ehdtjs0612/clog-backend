@@ -60,8 +60,9 @@ router.get("/", loginAuth, async (req, res, next) => {
             result.message = "프로필 조회 성공";
             result.data = data.rows[0]
         }
-        console.log(result)
+
         res.send(result);
+        
     } catch (error) {
         next(error);
     }
