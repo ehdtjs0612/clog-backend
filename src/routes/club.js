@@ -37,7 +37,7 @@ router.post("/", loginAuth, async (req, res, next) => {
 
         pgClient = await pool.connect();
         // 트랜잭션 시작
-        pgClient.query("BEGIN");
+        await pgClient.query("BEGIN");
 
         const insertClubQuery = `INSERT INTO 
                                             club_tb (name, cover, is_recruit, profile_img, banner_img, theme_color)
@@ -83,7 +83,7 @@ router.post("/", loginAuth, async (req, res, next) => {
         await pgClient.query(insertClubOwnerQuery, insertClubOwnerParams);
 
         // 트랜잭션 커밋
-        pgClient.query("COMMIT");
+        await pgClient.query("COMMIT");
 
         result.message = "동아리 생성 성공";
         result.data = {
@@ -247,6 +247,47 @@ router.get("/:clubId/notice/list", loginAuth, async (req, res, next) => {
             return res.send(result);
         }
         throw new BadRequestException("해당하는 동아리에 공지글이 존재하지 않습니다");
+
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 고정 공지 게시물 불러오는 api
+router.get("/:clubId/notice/fixed", loginAuth, async (req, res, next) => {
+    const result = {
+        message: "",
+        data: {}
+    }
+    const { clubId } = req.params;
+
+    try {
+        const selectedFixedNoticeSql = `SELECT
+                                                notice_post_tb.id,
+                                                notice_post_tb.title,
+                                                notice_post_tb.created_at AS createdAt,
+                                                account_tb.personal_color AS authorPcolor,
+                                                account_tb.name AS authorName
+                                        FROM 
+                                                notice_post_tb
+                                        JOIN
+                                                account_tb ON notice_post_tb.account_id = account_tb.id
+                                        WHERE
+                                                is_fixed = true
+                                        AND
+                                                club_id = $1
+                                        LIMIT
+                                                $2`;
+        const selectedFixedNoticeParam = [clubId, club.maxFixedNoticeCountPerPage];
+
+        const data = await pool.query(selectedFixedNoticeSql, selectedFixedNoticeParam);
+        if (data.rowCount !== 0) {
+            result.data = {
+                notice: data.rows
+            }
+            return res.send(result);
+        }
+        throw new BadRequestException("고정 공지 게시글이 존재하지 않습니다");
 
     } catch (error) {
         next(error);
