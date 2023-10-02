@@ -62,8 +62,9 @@ router.get("/", loginAuth, async (req, res, next) => {
             result.message = "프로필 조회 성공";
             result.data = data.rows[0]
         }
-        console.log(result)
+
         res.send(result);
+        
     } catch (error) {
         next(error);
     }
@@ -122,20 +123,20 @@ router.delete("/", loginAuth, async (req, res, next) => {
 
 // 비밀번호 재설정
 router.put("/pw", async (req, res, next) => {
-    const { email, newPw } = req.body
+    const { userId, newPw } = req.body
     const result = {
         message: "" | null,
         data: {}
     };
 
     try {
-        validate(email, "email").checkInput().checkEmailRegex();
+        validate(userId, "userId").checkInput().isNumber();
         validate(newPw, "newPw").checkInput().checkPwRegex();
 
         const hashedPassword = await bcryptUtil.hashing(newPw);
 
-        const sql = `UPDATE account_tb SET pw = $1 WHERE email = $2 `;
-        const params = [hashedPassword, email];
+        const sql = `UPDATE account_tb SET pw = $1 WHERE id = $2 `;
+        const params = [hashedPassword, userId];
         const data = await pool.query(sql, params);
 
         if (data.rowCount !== 0) {

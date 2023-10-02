@@ -24,5 +24,16 @@ module.exports = {
         president: 0,
         manager: 1,
         member: 2
+    },
+
+    notificationUrl: {
+        clubComment : "/comment",
+        clubReply : "/reply",
+        notiComment : "/notice/comment",
+        notiReply : "/notice/reply",
+        prComment : "/promotion/comment",
+        prReply : "/promotion/reply",
+        gradeUpdate : "/club/position",
+        joinAccept : "/club/member"
     }
 }
