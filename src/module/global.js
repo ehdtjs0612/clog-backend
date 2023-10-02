@@ -16,6 +16,7 @@ module.exports = {
         maxClubSmallCategoryLength: 5,
         maxBannerImageLength: 20000,
         maxProfileImageLength: 20000,
+        maxPostCountPerPage: 10
     },
 
     position: {

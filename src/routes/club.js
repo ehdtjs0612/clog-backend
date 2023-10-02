@@ -197,4 +197,60 @@ router.put("/", loginAuth, managerAuth, async (req, res, next) => {
     }
 });
 
+// 동아리 공지 게시물 불러오는 api
+router.get("/:clubId/notice/list", loginAuth, async (req, res, next) => {
+    const result = {
+        message: "",
+        data: {}
+    };
+    const { clubId } = req.params;
+    const { page } = req.query;
+
+    try {
+        validate(clubId, "clubId").checkInput().isNumber().checkLength(1, 5);
+        validate(page, "page").isNumber().checkLength(1, 5);
+
+        const offset = (page - 1) * club.maxPostCountPerPage;
+        const selectNoticeAllCountSql = `SELECT
+                                                count(*)::int
+                                          FROM
+                                                notice_post_tb`;
+
+        const selectNoticePostSql = `SELECT 
+                                            notice_post_tb.id,
+                                            notice_post_tb.title, 
+                                            notice_post_tb.content, 
+                                            notice_post_tb.is_fixed AS isFixed, 
+                                            TO_CHAR(notice_post_tb.created_at, 'YYYY-MM-DD') AS createdAt, 
+                                            account_tb.name AS authorName,
+                                            account_tb.personal_color AS authorPcolor
+                                     FROM 
+                                            notice_post_tb
+                                     JOIN 
+                                            account_tb ON notice_post_tb.account_id = account_tb.id
+                                     WHERE 
+                                            club_id = $1
+                                     ORDER BY 
+                                            notice_post_tb.created_at DESC 
+                                     OFFSET 
+                                            $2 
+                                     LIMIT 
+                                            $3`;
+        const selectNoticePostParam = [clubId, offset, club.maxPostCountPerPage];
+        const noticeAllCountData = await pool.query(selectNoticeAllCountSql);
+        const noticePostData = await pool.query(selectNoticePostSql, selectNoticePostParam);
+        if (noticePostData.rowCount !== 0) {
+            result.data = {
+                count: noticeAllCountData.rows[0].count,
+                notice: noticePostData.rows
+            }
+            return res.send(result);
+        }
+        throw new BadRequestException("해당하는 동아리에 공지글이 존재하지 않습니다");
+
+    } catch (error) {
+        next(error);
+    }
+});
+
 module.exports = router;
