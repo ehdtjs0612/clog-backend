@@ -1,16 +1,12 @@
-const pool = require("../../config/database/postgresql");
 const router = require("express").Router();
+const pool = require("../../config/database/postgresql");
+const redisClient = require("../../config/database/redis");
 const validate = require("../module/validation");
-const {
-    maxEmailLength,
-    maxPwLength,
-    certifiedLength: certifiedNumberLength
-} = require("../module/global");
 const bcryptUtil = require("../module/bcrypt");
 const jwtUtil = require("../module/jwt");
 const { BadRequestException } = require('../module/customError');
+const { auth, account } = require("../module/global");
 const emailHandler = require("../module/emailHandler");
-const redisClient = require("../../config/database/redis");
 
 // 로그인 api
 router.post("/login", async (req, res, next) => {
@@ -21,8 +17,8 @@ router.post("/login", async (req, res, next) => {
     };
 
     try {
-        validate(email, "email").checkInput().checkLength(1, maxEmailLength);
-        validate(pw, "pw").checkInput().checkLength(1, maxPwLength);
+        validate(email, "email").checkInput().checkLength(1, account.maxEmailLength);
+        validate(pw, "pw").checkInput().checkLength(1, account.maxPwLength);
 
         const sql = "SELECT id, pw FROM account_TB WHERE email = $1";
         const params = [email];
@@ -120,7 +116,7 @@ router.post("/signup/verify-email", async (req, res, next) => {
 
     try {
         validate(email, "email").checkInput().checkEmailRegex();
-        validate(code, "code").checkInput().isNumber().checkLength(certifiedNumberLength, certifiedNumberLength);
+        validate(code, "code").checkInput().isNumber().checkLength(auth.certifiedLength, auth.certifiedLength);
 
         const data = await redisClient.get(email);
         // redis에 이메일이 존재하지 않는 경우

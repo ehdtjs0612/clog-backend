@@ -25,8 +25,9 @@ router.post("/", async (req, res, next) => {
         const hashedPassword = await bcryptUtil.hashing(pw);
 
         const sql = `INSERT INTO 
-                        account_TB (major, email, pw, name, entry_year, personal_color)
-                        VALUES ($1, $2, $3, $4, $5, $6)`;
+                            account_TB (major, email, pw, name, entry_year, personal_color)
+                     VALUES 
+                            ($1, $2, $3, $4, $5, $6)`;
 
         const params = [major, email, hashedPassword, name, entryYear, personalColor()];
         const data = await pool.query(sql, params);
@@ -52,7 +53,8 @@ router.get("/", loginAuth, async (req, res, next) => {
     }
 
     try {
-        const sql = `SELECT name, personal_color AS "personalColor", major, entry_year AS "entryYear", created_at AS "createdAt" from account_tb WHERE id = $1`;
+        const sql = `SELECT 
+        name, personal_color AS "personalColor", major, entry_year AS "entryYear", created_at AS "createdAt" from account_tb WHERE id = $1`;
         const params = [req.decoded.id];
         const data = await pool.query(sql, params);
 

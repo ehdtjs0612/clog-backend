@@ -2,7 +2,7 @@ require("dotenv").config();
 
 const nodeMailer = require("nodemailer");
 const redisClient = require("../../config/database/redis");
-const { certifiedExpireTime } = require("./global");
+const { auth } = require("../module/global");
 
 const sendVerifyEmail = async (email) => {
     const transporter = nodeMailer.createTransport({
@@ -16,7 +16,7 @@ const sendVerifyEmail = async (email) => {
     });
     const authCode = Math.floor(Math.random() * 89999) + 10000;
     redisClient.set(email, authCode.toString());
-    redisClient.expire(email, certifiedExpireTime);
+    redisClient.expire(email, auth.certifiedExpireTime);
 
     const option = {
         from: process.env.NODEMAILER_ID,
