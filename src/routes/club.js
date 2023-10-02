@@ -3,11 +3,11 @@ const router = require("express").Router();
 const pool = require("../../config/database/postgresql");
 const validate = require('../module/validation');
 const mapping = require("../module/mapping");
-const { maxClubCoverLength, maxClubBelongLength, maxClubBigCategoryLength, maxClubSmallCategoryLength } = require("../module/global");
+const { club } = require("../module/global");
 const loginAuth = require("../middleware/loginAuth");
 const managerAuth = require("../middleware/managerAuth");
 const { BadRequestException } = require('../module/customError');
-const position = require("../module/global");
+const { position } = require("../module/global");
 
 // 동아리 생성 api
 router.post("/", loginAuth, async (req, res, next) => {
@@ -23,12 +23,12 @@ router.post("/", loginAuth, async (req, res, next) => {
 
     try {
         validate(name, "name").checkInput().checkClubNameRegex();
-        validate(cover, "cover").checkInput().checkLength(1, maxClubCoverLength);
+        validate(cover, "cover").checkInput().checkLength(1, club.maxClubCoverLength);
         validate(isAllowJoin, "isAllowJoin").checkInput().isBoolean();
         validate(themeColor, "themeColor").checkInput().checkThemeColorRegex();
-        validate(belong, "belong").checkInput().isNumber().checkLength(1, maxClubBelongLength);
-        validate(bigCategory, "bigCategory").checkInput().isNumber().checkLength(1, maxClubBigCategoryLength);
-        validate(smallCategory, "smallCategory").checkInput().isNumber().checkLength(1, maxClubSmallCategoryLength);
+        validate(belong, "belong").checkInput().isNumber().checkLength(1, club.maxClubBelongLength);
+        validate(bigCategory, "bigCategory").checkInput().isNumber().checkLength(1, club.maxClubBigCategoryLength);
+        validate(smallCategory, "smallCategory").checkInput().isNumber().checkLength(1, club.maxClubSmallCategoryLength);
 
         // 받아온 데이터 (소속, 대분류, 소분류) 매핑
         const convertedBelong = mapping.getBelong(belong);
@@ -98,12 +98,19 @@ router.get("/:clubId/profile", async (req, res, next) => {
     try {
         validate(clubId, "clubId").checkInput().isNumber().checkLength(1, 5);
 
-        const selectedClubSql = `SELECT club_tb.name AS name, belong_tb.name AS belong, big_category_tb.name AS bigCategory, small_category_tb.name AS smallCategory, club_tb.profile_img AS profileImage, club_tb.cover AS cover, club_tb.created_at AS createdAt
-                                        FROM club_tb
-                                        JOIN belong_tb ON club_tb.id = belong_tb.club_id
-                                        JOIN big_category_tb ON club_tb.id = big_category_tb.club_id
-                                        JOIN small_category_tb ON club_tb.id = small_category_tb.club_id
-                                        WHERE club_tb.id = $1`
+        const selectedClubSql = `SELECT club_tb.name 
+                                        AS name, belong_tb.name 
+                                        AS belong, big_category_tb.name 
+                                        AS bigCategory, small_category_tb.name 
+                                        AS smallCategory, club_tb.profile_img 
+                                        AS profileImage, club_tb.cover 
+                                        AS cover, club_tb.created_at 
+                                        AS createdAt
+                                                FROM club_tb
+                                                JOIN belong_tb ON club_tb.id = belong_tb.club_id
+                                                JOIN big_category_tb ON club_tb.id = big_category_tb.club_id
+                                                JOIN small_category_tb ON club_tb.id = small_category_tb.club_id
+                                                WHERE club_tb.id = $1`
         const selectedClubParams = [clubId];
 
         const clubProfiledata = await pool.query(selectedClubSql, selectedClubParams);
