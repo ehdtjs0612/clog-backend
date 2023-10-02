@@ -3,10 +3,10 @@ const router = require("express").Router();
 const pool = require("../../config/database/postgresql");
 const validate = require('../module/validation');
 const mapping = require("../module/mapping");
-const { club } = require("../module/global");
 const loginAuth = require("../middleware/loginAuth");
 const managerAuth = require("../middleware/managerAuth");
 const { BadRequestException } = require('../module/customError');
+const { club } = require("../module/global");
 const { position } = require("../module/global");
 
 // 동아리 생성 api
@@ -39,16 +39,32 @@ router.post("/", loginAuth, async (req, res, next) => {
         // 트랜잭션 시작
         pgClient.query("BEGIN");
 
-        const insertClubQuery = `INSERT INTO club_tb (name, cover, is_recruit, profile_img, banner_img, theme_color)
-                                        VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`;
-        const insertBelongQuery = `INSERT INTO belong_tb (club_id, name)
-                                        VALUES ($1, $2)`;
-        const insertBigCategoryQuery = `INSERT INTO big_category_tb (club_id, name)
-                                             VALUES ($1, $2)`;
-        const insertSmallCategoryQuery = `INSERT INTO small_category_tb (club_id, name)
-                                              VALUES ($1, $2)`;
-        const insertClubOwnerQuery = `INSERT INTO club_member_tb (account_id, club_id, position)
-                                          VALUES ($1, $2, $3)`;
+        const insertClubQuery = `INSERT INTO 
+                                            club_tb (name, cover, is_recruit, profile_img, banner_img, theme_color)
+                                 VALUES 
+                                            ($1, $2, $3, $4, $5, $6) 
+                                 RETURNING 
+                                            id`;
+
+        const insertBelongQuery = `INSERT INTO 
+                                            belong_tb (club_id, name)
+                                   VALUES 
+                                            ($1, $2)`;
+
+        const insertBigCategoryQuery = `INSERT INTO 
+                                                big_category_tb (club_id, name)
+                                        VALUES 
+                                               ($1, $2)`;
+
+        const insertSmallCategoryQuery = `INSERT INTO 
+                                                small_category_tb (club_id, name)
+                                          VALUES 
+                                                ($1, $2)`;
+
+        const insertClubOwnerQuery = `INSERT INTO 
+                                            club_member_tb (account_id, club_id, position)
+                                      VALUES 
+                                            ($1, $2, $3)`;
 
         const insertClubParam = [name, cover, isAllowJoin, profileImg, bannerImg, themeColor];
         const insertClubData = await pgClient.query(insertClubQuery, insertClubParam);
@@ -73,7 +89,7 @@ router.post("/", loginAuth, async (req, res, next) => {
         result.data = {
             "clubId": createdClubId
         }
-        res.send(result);
+        return res.send(result);
 
     } catch (error) {
         if (pgClient) {
@@ -98,19 +114,24 @@ router.get("/:clubId/profile", async (req, res, next) => {
     try {
         validate(clubId, "clubId").checkInput().isNumber().checkLength(1, 5);
 
-        const selectedClubSql = `SELECT club_tb.name 
-                                        AS name, belong_tb.name 
-                                        AS belong, big_category_tb.name 
-                                        AS bigCategory, small_category_tb.name 
-                                        AS smallCategory, club_tb.profile_img 
-                                        AS profileImage, club_tb.cover 
-                                        AS cover, club_tb.created_at 
-                                        AS createdAt
-                                                FROM club_tb
-                                                JOIN belong_tb ON club_tb.id = belong_tb.club_id
-                                                JOIN big_category_tb ON club_tb.id = big_category_tb.club_id
-                                                JOIN small_category_tb ON club_tb.id = small_category_tb.club_id
-                                                WHERE club_tb.id = $1`
+        const selectedClubSql = `SELECT 
+                                        club_tb.name AS name, 
+                                        belong_tb.name AS belong, 
+                                        big_category_tb.name AS bigCategory, 
+                                        small_category_tb.name AS smallCategory, 
+                                        club_tb.profile_img AS profileImage, 
+                                        club_tb.cover AS cover, 
+                                        club_tb.created_at AS createdAt
+                                 FROM 
+                                        club_tb
+                                 JOIN 
+                                        belong_tb ON club_tb.id = belong_tb.club_id
+                                 JOIN   
+                                        big_category_tb ON club_tb.id = big_category_tb.club_id
+                                 JOIN   
+                                        small_category_tb ON club_tb.id = small_category_tb.club_id
+                                 WHERE 
+                                        club_tb.id = $1`
         const selectedClubParams = [clubId];
 
         const clubProfiledata = await pool.query(selectedClubSql, selectedClubParams);
@@ -120,7 +141,7 @@ router.get("/:clubId/profile", async (req, res, next) => {
         result.data = {
             club: clubProfiledata.rows
         }
-        res.send(result);
+        return res.send(result);
 
     } catch (error) {
         next(error);
@@ -150,9 +171,17 @@ router.put("/", loginAuth, managerAuth, async (req, res, next) => {
         validate(bannerImg, "bannerImg").checkInput().checkLength(1, maxBannerImageLength);
         validate(profileImg, "profileImg").checkInput().checkLength(1, maxProfileImageLength);
 
-        const modifyClubProfileSql = `UPDATE club_tb 
-                                            SET name = $1, cover = $2, is_recruit = $3, theme_color = $4, banner_img = $5, profile_img = $6 
-                                            WHERE id = $7`;
+        const modifyClubProfileSql = `UPDATE 
+                                            club_tb
+                                      SET 
+                                            name = $1, 
+                                            cover = $2, 
+                                            is_recruit = $3, 
+                                            theme_color = $4, 
+                                            banner_img = $5, 
+                                            profile_img = $6 
+                                      WHERE 
+                                            id = $7`;
         const modifyClubProfileParam = [
             name, cover, isAllowJoin, themeColor, bannerImg, profileImg,
             clubId
@@ -162,6 +191,62 @@ router.put("/", loginAuth, managerAuth, async (req, res, next) => {
             result.message = "수정 성공";
             return res.send(result);
         }
+
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 동아리 공지 게시물 불러오는 api
+router.get("/:clubId/notice/list", loginAuth, async (req, res, next) => {
+    const result = {
+        message: "",
+        data: {}
+    };
+    const { clubId } = req.params;
+    const { page } = req.query;
+
+    try {
+        validate(clubId, "clubId").checkInput().isNumber().checkLength(1, 5);
+        validate(page, "page").isNumber().checkLength(1, 5);
+
+        const offset = (page - 1) * club.maxPostCountPerPage;
+        const selectNoticeAllCountSql = `SELECT
+                                                count(*)::int
+                                          FROM
+                                                notice_post_tb`;
+
+        const selectNoticePostSql = `SELECT 
+                                            notice_post_tb.id,
+                                            notice_post_tb.title, 
+                                            notice_post_tb.content, 
+                                            notice_post_tb.is_fixed AS isFixed, 
+                                            TO_CHAR(notice_post_tb.created_at, 'YYYY-MM-DD') AS createdAt, 
+                                            account_tb.name AS authorName,
+                                            account_tb.personal_color AS authorPcolor
+                                     FROM 
+                                            notice_post_tb
+                                     JOIN 
+                                            account_tb ON notice_post_tb.account_id = account_tb.id
+                                     WHERE 
+                                            club_id = $1
+                                     ORDER BY 
+                                            notice_post_tb.created_at DESC 
+                                     OFFSET 
+                                            $2 
+                                     LIMIT 
+                                            $3`;
+        const selectNoticePostParam = [clubId, offset, club.maxPostCountPerPage];
+        const noticeAllCountData = await pool.query(selectNoticeAllCountSql);
+        const noticePostData = await pool.query(selectNoticePostSql, selectNoticePostParam);
+        if (noticePostData.rowCount !== 0) {
+            result.data = {
+                count: noticeAllCountData.rows[0].count,
+                notice: noticePostData.rows
+            }
+            return res.send(result);
+        }
+        throw new BadRequestException("해당하는 동아리에 공지글이 존재하지 않습니다");
 
     } catch (error) {
         next(error);
