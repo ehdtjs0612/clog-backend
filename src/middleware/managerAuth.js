@@ -4,7 +4,7 @@ const { ForbbidenException } = require('../module/customError');
 
 module.exports = async (req, res, next) => {
     const userId = req.decoded.id;
-    const clubId = req.params.clubId || req.body.clubId;
+    const clubId = req.params.clubId ?? req.body.clubId;
 
     try {
         const selectPositionSql = `SELECT position FROM club_member_tb WHERE account_id = $1 AND club_id = $2`;
@@ -15,6 +15,7 @@ module.exports = async (req, res, next) => {
             return next();
         }
 
+        // 404 던져줄건지 403 던져줄건지 협의해야함
         throw new ForbbidenException("관리자 권한이 필요합니다");
     } catch (error) {
         next(error);
