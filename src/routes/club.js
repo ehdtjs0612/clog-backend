@@ -98,12 +98,19 @@ router.get("/:clubId/profile", async (req, res, next) => {
     try {
         validate(clubId, "clubId").checkInput().isNumber().checkLength(1, 5);
 
-        const selectedClubSql = `SELECT club_tb.name AS name, belong_tb.name AS belong, big_category_tb.name AS bigCategory, small_category_tb.name AS smallCategory, club_tb.profile_img AS profileImage, club_tb.cover AS cover, club_tb.created_at AS createdAt
-                                        FROM club_tb
-                                        JOIN belong_tb ON club_tb.id = belong_tb.club_id
-                                        JOIN big_category_tb ON club_tb.id = big_category_tb.club_id
-                                        JOIN small_category_tb ON club_tb.id = small_category_tb.club_id
-                                        WHERE club_tb.id = $1`
+        const selectedClubSql = `SELECT club_tb.name 
+                                        AS name, belong_tb.name 
+                                        AS belong, big_category_tb.name 
+                                        AS bigCategory, small_category_tb.name 
+                                        AS smallCategory, club_tb.profile_img 
+                                        AS profileImage, club_tb.cover 
+                                        AS cover, club_tb.created_at 
+                                        AS createdAt
+                                                FROM club_tb
+                                                JOIN belong_tb ON club_tb.id = belong_tb.club_id
+                                                JOIN big_category_tb ON club_tb.id = big_category_tb.club_id
+                                                JOIN small_category_tb ON club_tb.id = small_category_tb.club_id
+                                                WHERE club_tb.id = $1`
         const selectedClubParams = [clubId];
 
         const clubProfiledata = await pool.query(selectedClubSql, selectedClubParams);
