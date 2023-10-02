@@ -1,12 +1,12 @@
-const pool = require("../../config/database/postgresql");
 const router = require("express").Router();
+const pool = require("../../config/database/postgresql");
+const redisClient = require("../../config/database/redis");
 const validate = require("../module/validation");
-const { auth, account } = require("../module/global");
 const bcryptUtil = require("../module/bcrypt");
 const jwtUtil = require("../module/jwt");
 const { BadRequestException } = require('../module/customError');
+const { auth, account } = require("../module/global");
 const emailHandler = require("../module/emailHandler");
-const redisClient = require("../../config/database/redis");
 
 // 로그인 api
 router.post("/login", async (req, res, next) => {
