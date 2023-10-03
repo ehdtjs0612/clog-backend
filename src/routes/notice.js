@@ -1,6 +1,9 @@
 const router = require("express").Router();
-const validate = require("../module/validation");
+const pool = require("../../config/database/postgresql");
 const loginAuth = require("../middleware/loginAuth");
+const validate = require("../module/validation");
+const { club } = require("../module/global");
+const { BadRequestException } = require("../module/customError");
 
 // 동아리 공지 게시물 불러오는 api
 router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
@@ -9,7 +12,8 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
         data: {}
     };
     const { clubId } = req.params;
-    const { page } = req.query;
+    let page = req.query.page ?? 1;
+    if (page < 1) page = 1;
 
     try {
         validate(clubId, "clubId").checkInput().isNumber().checkLength(1, 5);
@@ -38,7 +42,7 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
                                      ORDER BY 
                                             notice_post_tb.created_at DESC 
                                      OFFSET 
-                                            $2 
+                                            $2
                                      LIMIT 
                                             $3`;
         const selectNoticePostParam = [clubId, offset, club.maxPostCountPerPage];
