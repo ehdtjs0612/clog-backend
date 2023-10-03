@@ -8,9 +8,9 @@ const { notificationUrl } = require("../module/global")
 const createNotification = async (url, key) => {
     let type
     let sql
-    
+
     switch (url) {
-        case notificationUrl.clubComment :
+        case notificationUrl.clubComment:
             type = "club_comment"
             sql = `SELECT account_tb.name AS "author", 
                 club_tb.name  AS "club_name",
@@ -24,7 +24,7 @@ const createNotification = async (url, key) => {
             WHERE club_comment_tb.id = $1`
             break
 
-        case notificationUrl.clubReply :
+        case notificationUrl.clubReply:
             type = "club_reply"
             sql = `SELECT account_tb.name AS "author",
                     club_tb.name  AS "club_name",
@@ -40,7 +40,7 @@ const createNotification = async (url, key) => {
                 WHERE club_reply_tb.id = $1`
             break
 
-        case notificationUrl.prComment :
+        case notificationUrl.prComment:
             type = "pr_comment"
             sql = `WITH selected (club_id, post_id) 
                 AS (SELECT promotion_post_tb.club_id,
@@ -59,7 +59,7 @@ const createNotification = async (url, key) => {
                 WHERE club_tb.id = selected.club_id AND club_member_tb.position < 2`
             break
 
-        case notificationUrl.prReply :
+        case notificationUrl.prReply:
             type = "pr_reply"
             sql = `SELECT promotion_comment_tb.account_id AS "user_id",
                 promotion_post_tb.id AS "post_id",
@@ -70,7 +70,7 @@ const createNotification = async (url, key) => {
             WHERE promotion_reply_tb.id = $1`
             break
 
-        case notificationUrl.notiComment :
+        case notificationUrl.notiComment:
             type = "noti_comment"
             sql = `SELECT account_tb.name AS "author",
                 club_tb.name  AS "club_name",
@@ -84,7 +84,7 @@ const createNotification = async (url, key) => {
             WHERE notice_comment_tb.id = $1`
             break
 
-        case notificationUrl.notiReply :
+        case notificationUrl.notiReply:
             type = "noti_reply"
             sql = `SELECT account_tb.name AS "author",
                 club_tb.name  AS "club_name",
@@ -100,7 +100,7 @@ const createNotification = async (url, key) => {
             WHERE notice_reply_tb.id = $1`
             break
 
-        case notificationUrl.gradeUpdate :
+        case notificationUrl.gradeUpdate:
             type = "grade_update"
             sql = `SELECT club_member_tb.account_id AS "user_id",
             club_member_tb.position AS "position",
@@ -111,7 +111,7 @@ const createNotification = async (url, key) => {
             WHERE club_member_tb.id = $1`
             break
 
-        case notificationUrl.joinAccept :
+        case notificationUrl.joinAccept:
             type = "join_accept"
             sql = `SELECT club_member_tb.account_id AS "user_id",
             club_tb.name AS "club_name",
@@ -120,22 +120,22 @@ const createNotification = async (url, key) => {
             JOIN club_tb ON club_member_tb.club_id = club_tb.id
             WHERE club_member_tb.id = $1`
             break
-        default :
+        default:
             break
     }
 
     const selectedData = await pool.query(sql, [key])
-       
-    if (selectedData.rowCount == 0) throw new BadRequestException ("존재하지 않는 알림입니다")
+
+    if (selectedData.rowCount == 0) throw new BadRequestException("존재하지 않는 알림입니다")
 
     for (let index = 0; index < selectedData.rowCount; index++) {
         selectedData.rows[index].type = type
         selectedData.rows[index].is_read = false
     }
-    
+
     conn = await client.connect(process.env.MONGODB_URL)
 
-    if (selectedData.rowCount != 0) await conn.db("clog_mongodb").collection("notification").insertMany(selectedData.rows,{ignoreUndefined : true})
+    if (selectedData.rowCount != 0) await conn.db("clog_mongodb").collection("notification").insertMany(selectedData.rows, { ignoreUndefined: true })
 
     if (type == "club_reply") {
         await createNotification(notificationUrl.clubComment, selectedData.rows[0].comment_id)
