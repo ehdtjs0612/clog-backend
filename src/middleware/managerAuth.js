@@ -1,6 +1,6 @@
 const pool = require("../../config/database/postgresql");
 const { position } = require("../module/global");
-const { ForbbidenException } = require('../module/customError');
+const { NotFoundException } = require('../module/customError');
 
 module.exports = async (req, res, next) => {
     const userId = req.decoded.id;
@@ -14,9 +14,8 @@ module.exports = async (req, res, next) => {
             if (selectPositionData.rows[0].position !== position.member);
             return next();
         }
+        throw new NotFoundException("해당하는 페이지가 존재하지 않습니다");
 
-        // 404 던져줄건지 403 던져줄건지 협의해야함
-        throw new ForbbidenException("관리자 권한이 필요합니다");
     } catch (error) {
         next(error);
     }
