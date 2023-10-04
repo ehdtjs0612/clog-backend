@@ -2,7 +2,6 @@
 const router = require("express").Router();
 const pool = require("../../config/database/postgresql");
 const validate = require('../module/validation');
-const mapping = require("../module/mapping");
 const loginAuth = require("../middleware/loginAuth");
 const managerAuth = require("../middleware/managerAuth");
 const { BadRequestException } = require('../module/customError');
@@ -131,6 +130,7 @@ router.get("/:clubId/profile", async (req, res, next) => {
 });
 
 // 동아리 관리자 페이지 (동아리 프로필)api
+// 논의 필요
 router.get("/:clubId/manage", loginAuth, managerAuth, async (req, res, next) => {
 });
 
@@ -201,6 +201,38 @@ router.get("/duplicate/club-name/:clubName", loginAuth, async (req, res, next) =
         throw new BadRequestException("해당하는 동아리 이름이 존재합니다");
 
     } catch (error) {
+        next(error);
+    }
+});
+
+// 동아리 가입 신청 승인 api
+router.post("/member", loginAuth, managerAuth, async (req, res, next) => {
+    const { userId, clubId } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    }
+
+    try {
+        validate(userId, "userId").checkInput().isNumber().checkLength(1, 5);
+        validate(clubId, "clubId").checkInput().isNumber().checkLength(1, 5);
+
+        const insertMemberSql = `INSERT INTO 
+                                            club_member_tb (account_id, club_id, position)
+                                   VALUES
+                                            ($1, $2, $3)`;
+        const insertedMemberParams = [userId, clubId, position.member];
+        const data = await pool.query(insertMemberSql, insertedMemberParams);
+        result.data = data;
+        res.send(result);
+
+    } catch (error) {
+        if (error.constraint === constraint.uniqueClubMember) {
+            return next(new BadRequestException("해당하는 부원이 이미 존재합니다"));
+        }
+        if (error.constraint === constraint.fkAccount) {
+            return next(new BadRequestException("해당하는 사용자가 존재하지 않습니다"));
+        }
         next(error);
     }
 });
