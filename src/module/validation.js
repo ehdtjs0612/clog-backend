@@ -5,7 +5,8 @@ const errorMessage = {
     length: "길이가 비정상적입니다",
     regex: "정규표현식 실패",
     isNumber: "정수가 아닙니다",
-    isBoolean: "true or false만 가능합니다"
+    isBoolean: "true or false만 가능합니다",
+    isPositive: "정수만 가능합니다"
 }
 
 function Validation(input, name) {
@@ -51,6 +52,11 @@ function Validation(input, name) {
 
     this.isBoolean = () => {
         if (input !== "true" && input !== "false") this.setError(errorMessage.isBoolean);
+        return this;
+    }
+
+    this.isPositive = () => {
+        if (Number(input) < 1) this.setError(errorMessage.isPositive);
         return this;
     }
 
