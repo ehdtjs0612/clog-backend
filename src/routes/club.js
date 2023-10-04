@@ -107,11 +107,11 @@ router.get("/:clubId/profile", async (req, res, next) => {
                                  FROM 
                                         club_tb
                                  JOIN 
-                                        belong_tb ON club_tb.id = belong_tb.club_id
+                                        belong_tb ON club_tb.belong = belong_tb.id
                                  JOIN   
-                                        big_category_tb ON club_tb.id = big_category_tb.club_id
+                                        big_category_tb ON club_tb.big_category = big_category_tb.id
                                  JOIN   
-                                        small_category_tb ON club_tb.id = small_category_tb.club_id
+                                        small_category_tb ON club_tb.small_category = small_category_tb.id
                                  WHERE 
                                         club_tb.id = $1`
         const selectedClubParams = [clubId];
@@ -121,7 +121,7 @@ router.get("/:clubId/profile", async (req, res, next) => {
             throw new BadRequestException("해당하는 동아리가 존재하지 않습니다");
         }
         result.data = {
-            club: clubProfiledata.rows
+            club: clubProfiledata.rows[0]
         }
         return res.send(result);
 
