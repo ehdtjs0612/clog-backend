@@ -8,6 +8,7 @@ const managerAuth = require("../middleware/managerAuth");
 const { BadRequestException } = require('../module/customError');
 const { club } = require("../module/global");
 const { position } = require("../module/global");
+const constraint = require("../module/constraint");
 
 // 동아리 생성 api
 router.post("/", loginAuth, async (req, res, next) => {
@@ -16,71 +17,40 @@ router.post("/", loginAuth, async (req, res, next) => {
         data: {}
     }
     const {
-        name, belong, bigCategory, smallCategory, cover, isAllowJoin, themeColor, bannerImg, profileImg
+        belong, bigCategory, smallCategory, name, cover, isRecruit, themeColor, profileImg, bannerImg
     } = req.body;
     const userId = req.decoded.id;
     let pgClient = null;
 
     try {
-        validate(name, "name").checkInput().checkClubNameRegex();
-        validate(cover, "cover").checkInput().checkLength(1, club.maxClubCoverLength);
-        validate(isAllowJoin, "isAllowJoin").checkInput().isBoolean();
-        validate(themeColor, "themeColor").checkInput().checkThemeColorRegex();
         validate(belong, "belong").checkInput().isNumber().checkLength(1, club.maxClubBelongLength);
         validate(bigCategory, "bigCategory").checkInput().isNumber().checkLength(1, club.maxClubBigCategoryLength);
         validate(smallCategory, "smallCategory").checkInput().isNumber().checkLength(1, club.maxClubSmallCategoryLength);
-
-        // 받아온 데이터 (소속, 대분류, 소분류) 매핑
-        const convertedBelong = mapping.getBelong(belong);
-        const convertedBigCategory = mapping.getBigCategory(bigCategory);
-        const convertedSmallCategory = mapping.getSmallCategory(smallCategory);
+        validate(name, "name").checkInput().checkClubNameRegex();
+        validate(cover, "cover").checkInput().checkLength(1, club.maxClubCoverLength);
+        validate(isRecruit, "isRecruit").checkInput().isBoolean();
+        validate(themeColor, "themeColor").checkInput().checkThemeColorRegex();
 
         pgClient = await pool.connect();
         // 트랜잭션 시작
         await pgClient.query("BEGIN");
 
-        const insertClubQuery = `INSERT INTO 
-                                            club_tb (name, cover, is_recruit, profile_img, banner_img, theme_color)
+        const createClubSql = `INSERT INTO 
+                                        club_tb (belong, big_category, small_category, name, cover, is_recruit, profile_img, banner_img, theme_color)
+                               VALUES
+                                        ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                               RETURNING
+                                        id`;
+        const createClubParam = [belong, bigCategory, smallCategory, name, cover, isRecruit, profileImg, bannerImg, themeColor];
+        const createdClubData = await pool.query(createClubSql, createClubParam);
+        const createdClubId = createdClubData.rows[0].id;
+
+        const insertMemberSql = `INSERT INTO 
+                                        club_member_tb (account_id, club_id, position) 
                                  VALUES 
-                                            ($1, $2, $3, $4, $5, $6) 
-                                 RETURNING 
-                                            id`;
-
-        const insertBelongQuery = `INSERT INTO 
-                                            belong_tb (club_id, name)
-                                   VALUES 
-                                            ($1, $2)`;
-
-        const insertBigCategoryQuery = `INSERT INTO 
-                                                big_category_tb (club_id, name)
-                                        VALUES 
-                                               ($1, $2)`;
-
-        const insertSmallCategoryQuery = `INSERT INTO 
-                                                small_category_tb (club_id, name)
-                                          VALUES 
-                                                ($1, $2)`;
-
-        const insertClubOwnerQuery = `INSERT INTO 
-                                            club_member_tb (account_id, club_id, position)
-                                      VALUES 
-                                            ($1, $2, $3)`;
-
-        const insertClubParam = [name, cover, isAllowJoin, profileImg, bannerImg, themeColor];
-        const insertClubData = await pgClient.query(insertClubQuery, insertClubParam);
-        const createdClubId = insertClubData.rows[0].id;
-
-        const insertBelongParam = [createdClubId, convertedBelong];
-        await pgClient.query(insertBelongQuery, insertBelongParam);
-
-        const insertBigCategoryParam = [createdClubId, convertedBigCategory];
-        await pgClient.query(insertBigCategoryQuery, insertBigCategoryParam);
-
-        const insertSmallCategoryParam = [createdClubId, convertedSmallCategory];
-        await pgClient.query(insertSmallCategoryQuery, insertSmallCategoryParam);
-
-        const insertClubOwnerParams = [userId, createdClubId, position.president];
-        await pgClient.query(insertClubOwnerQuery, insertClubOwnerParams);
+                                        ($1, $2, $3)`;
+        const insertMemberParam = [userId, createdClubId, position.president];
+        await pool.query(insertMemberSql, insertMemberParam);
 
         // 트랜잭션 커밋
         await pgClient.query("COMMIT");
@@ -94,6 +64,18 @@ router.post("/", loginAuth, async (req, res, next) => {
     } catch (error) {
         if (pgClient) {
             await pgClient.query("ROLLBACK");
+        }
+        if (error.constraint === constraint.uniqueClubName) {
+            next(new BadRequestException("이미 존재하는 동아리 이름입니다"))
+        }
+        if (error.constraint === constraint.fkBelong) {
+            next(new BadRequestException("해당하는 소속이 존재하지 않습니다"));
+        }
+        if (error.constraint === constraint.fkBigCategory) {
+            next(new BadRequestException("해당하는 대분류가 존재하지 않습니다"))
+        }
+        if (error.constraint === constraint.fkSmallCategory) {
+            next(new BadRequestException("해당하는 소분류가 존재하지 않습니다"));
         }
         next(error);
 
@@ -125,11 +107,11 @@ router.get("/:clubId/profile", async (req, res, next) => {
                                  FROM 
                                         club_tb
                                  JOIN 
-                                        belong_tb ON club_tb.id = belong_tb.club_id
+                                        belong_tb ON club_tb.belong = belong_tb.id
                                  JOIN   
-                                        big_category_tb ON club_tb.id = big_category_tb.club_id
+                                        big_category_tb ON club_tb.big_category = big_category_tb.id
                                  JOIN   
-                                        small_category_tb ON club_tb.id = small_category_tb.club_id
+                                        small_category_tb ON club_tb.small_category = small_category_tb.id
                                  WHERE 
                                         club_tb.id = $1`
         const selectedClubParams = [clubId];
@@ -139,7 +121,7 @@ router.get("/:clubId/profile", async (req, res, next) => {
             throw new BadRequestException("해당하는 동아리가 존재하지 않습니다");
         }
         result.data = {
-            club: clubProfiledata.rows
+            club: clubProfiledata.rows[0]
         }
         return res.send(result);
 
@@ -197,97 +179,26 @@ router.put("/", loginAuth, managerAuth, async (req, res, next) => {
     }
 });
 
-// 동아리 공지 게시물 불러오는 api
-router.get("/:clubId/notice/list", loginAuth, async (req, res, next) => {
+// 동아리 이름 중복 체크 api
+router.get("/duplicate/club-name/:clubName", loginAuth, async (req, res, next) => {
     const result = {
         message: "",
         data: {}
     };
-    const { clubId } = req.params;
-    const { page } = req.query;
+    const { clubName } = req.params;
 
+    // 공백 제거 한 clubName 과 공백 제거 한 club_tb(name)을 비교
+    const removeSpaceClubName = clubName.replace(/\s+/g, ''); // 공백 제거
     try {
-        validate(clubId, "clubId").checkInput().isNumber().checkLength(1, 5);
-        validate(page, "page").isNumber().checkLength(1, 5);
-
-        const offset = (page - 1) * club.maxPostCountPerPage;
-        const selectNoticeAllCountSql = `SELECT
-                                                count(*)::int
-                                          FROM
-                                                notice_post_tb`;
-
-        const selectNoticePostSql = `SELECT 
-                                            notice_post_tb.id,
-                                            notice_post_tb.title, 
-                                            notice_post_tb.content, 
-                                            notice_post_tb.is_fixed AS isFixed, 
-                                            TO_CHAR(notice_post_tb.created_at, 'YYYY-MM-DD') AS createdAt, 
-                                            account_tb.name AS authorName,
-                                            account_tb.personal_color AS authorPcolor
-                                     FROM 
-                                            notice_post_tb
-                                     JOIN 
-                                            account_tb ON notice_post_tb.account_id = account_tb.id
-                                     WHERE 
-                                            club_id = $1
-                                     ORDER BY 
-                                            notice_post_tb.created_at DESC 
-                                     OFFSET 
-                                            $2 
-                                     LIMIT 
-                                            $3`;
-        const selectNoticePostParam = [clubId, offset, club.maxPostCountPerPage];
-        const noticeAllCountData = await pool.query(selectNoticeAllCountSql);
-        const noticePostData = await pool.query(selectNoticePostSql, selectNoticePostParam);
-        if (noticePostData.rowCount !== 0) {
-            result.data = {
-                count: noticeAllCountData.rows[0].count,
-                notice: noticePostData.rows
-            }
+        validate(removeSpaceClubName, "club-name").checkInput().checkClubNameRegex();
+        const selectClubNameSql = `SELECT name FROM club_tb WHERE REPLACE(name, ' ', '') = $1`;
+        const selectClubNameParam = [removeSpaceClubName];
+        const selectClubNameData = await pool.query(selectClubNameSql, selectClubNameParam);
+        if (selectClubNameData.rowCount === 0) {
+            result.message = "사용 가능한 이름입니다";
             return res.send(result);
         }
-        throw new BadRequestException("해당하는 동아리에 공지글이 존재하지 않습니다");
-
-    } catch (error) {
-        next(error);
-    }
-});
-
-// 고정 공지 게시물 불러오는 api
-router.get("/:clubId/notice/fixed", loginAuth, async (req, res, next) => {
-    const result = {
-        message: "",
-        data: {}
-    }
-    const { clubId } = req.params;
-
-    try {
-        const selectedFixedNoticeSql = `SELECT
-                                                notice_post_tb.id,
-                                                notice_post_tb.title,
-                                                notice_post_tb.created_at AS createdAt,
-                                                account_tb.personal_color AS authorPcolor,
-                                                account_tb.name AS authorName
-                                        FROM 
-                                                notice_post_tb
-                                        JOIN
-                                                account_tb ON notice_post_tb.account_id = account_tb.id
-                                        WHERE
-                                                is_fixed = true
-                                        AND
-                                                club_id = $1
-                                        LIMIT
-                                                $2`;
-        const selectedFixedNoticeParam = [clubId, club.maxFixedNoticeCountPerPage];
-
-        const data = await pool.query(selectedFixedNoticeSql, selectedFixedNoticeParam);
-        if (data.rowCount !== 0) {
-            result.data = {
-                notice: data.rows
-            }
-            return res.send(result);
-        }
-        throw new BadRequestException("고정 공지 게시글이 존재하지 않습니다");
+        throw new BadRequestException("해당하는 동아리 이름이 존재합니다");
 
     } catch (error) {
         next(error);
