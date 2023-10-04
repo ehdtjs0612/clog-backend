@@ -48,7 +48,7 @@ router.post("/", async (req, res, next) => {
 // 프로필 조회
 router.get("/", loginAuth, async (req, res, next) => {
     const result = {
-        message: "" | null,
+        message: "",
         data: {}
     }
 
@@ -74,7 +74,7 @@ router.get("/", loginAuth, async (req, res, next) => {
 router.put("/", loginAuth, async (req, res, next) => {
     const { name, entryYear, major } = req.body;
     const result = {
-        message: "" | null,
+        message: "",
         data: {}
     }
 
@@ -101,7 +101,7 @@ router.put("/", loginAuth, async (req, res, next) => {
 // 회원 탈퇴
 router.delete("/", loginAuth, async (req, res, next) => {
     const result = {
-        message: "" | null,
+        message: "",
         data: {}
     }
 
@@ -125,7 +125,7 @@ router.delete("/", loginAuth, async (req, res, next) => {
 router.put("/pw", async (req, res, next) => {
     const { userId, newPw } = req.body
     const result = {
-        message: "" | null,
+        message: "",
         data: {}
     };
 
@@ -154,7 +154,7 @@ router.put("/pw", async (req, res, next) => {
 router.put("/loged-in/pw", loginAuth, async (req, res, next) => {
     const { newPw } = req.body
     const result = {
-        message: "" | null,
+        message: "",
         data: {}
     };
 

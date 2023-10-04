@@ -9,11 +9,12 @@ const accountApi = require("./routes/account");
 const authApi = require("./routes/auth");
 const uploadApi = require("./routes/upload");
 const clubApi = require("./routes/club");
+const notificationApi = require("./routes/notification");
 
 const errorHandling = require("./middleware/errorHandling");
 
 // connect redis client
-redisClient.connect();
+// redisClient.connect();
 
 // global middleware
 app.use(express.json());
@@ -24,6 +25,7 @@ app.use("/account", accountApi);
 app.use("/auth", authApi);
 app.use("/upload", uploadApi);
 app.use("/club", clubApi);
+app.use("/notification", notificationApi);
 
 // error handling muddleware
 app.use(errorHandling());
