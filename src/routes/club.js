@@ -7,7 +7,7 @@ const managerAuth = require("../middleware/managerAuth");
 const { BadRequestException } = require('../module/customError');
 const { club } = require("../module/global");
 const { position } = require("../module/global");
-const constraint = require("../module/constraint");
+const CONSTRAINT = require("../module/constraint");
 
 // 동아리 생성 api
 router.post("/", loginAuth, async (req, res, next) => {
@@ -64,16 +64,16 @@ router.post("/", loginAuth, async (req, res, next) => {
         if (pgClient) {
             await pgClient.query("ROLLBACK");
         }
-        if (error.constraint === constraint.uniqueClubName) {
+        if (error.constraint === CONSTRAINT.uniqueClubName) {
             next(new BadRequestException("이미 존재하는 동아리 이름입니다"))
         }
-        if (error.constraint === constraint.fkBelong) {
+        if (error.constraint === CONSTRAINT.fkBelong) {
             next(new BadRequestException("해당하는 소속이 존재하지 않습니다"));
         }
-        if (error.constraint === constraint.fkBigCategory) {
+        if (error.constraint === CONSTRAINT.fkBigCategory) {
             next(new BadRequestException("해당하는 대분류가 존재하지 않습니다"))
         }
-        if (error.constraint === constraint.fkSmallCategory) {
+        if (error.constraint === CONSTRAINT.fkSmallCategory) {
             next(new BadRequestException("해당하는 소분류가 존재하지 않습니다"));
         }
         next(error);
