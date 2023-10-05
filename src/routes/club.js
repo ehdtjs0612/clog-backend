@@ -380,4 +380,28 @@ router.post("/member", loginAuth, managerAuth, async (req, res, next) => {
     }
 });
 
+// 동아리 가입 신청 거부 api
+router.delete("/join-request", loginAuth, managerAuth, async (req, res, next) => {
+    const { requestId } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(requestId, "requestId").checkInput().isNumber();
+
+        const deleteJoinRequestSql = `DELETE FROM join_request_tb WHERE id = $1`;
+        const deleteJoinRequestParam = [requestId];
+        const deleteJoinRequestData = await pool.query(deleteJoinRequestSql, deleteJoinRequestParam);
+        if (deleteJoinRequestData.rowCount === 0) {
+            throw new BadRequestException("해당하는 가입 신청 내역이 존재하지 않습니다");
+        }
+        res.send(result);
+
+    } catch (error) {
+        next(error);
+    }
+});
+
 module.exports = router;
