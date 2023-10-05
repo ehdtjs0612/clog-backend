@@ -8,7 +8,7 @@ module.exports = async (req, res, next) => {
     const clubId = req.params.clubId ?? req.body.clubId;
 
     try {
-        validate(clubId, "club-id").checkInput().isNumber();
+        validate(clubId, "clubId").checkInput().isNumber();
 
         const selectPositionSql = `SELECT position FROM club_member_tb WHERE account_id = $1 AND club_id = $2`;
         const selectPositionParam = [userId, clubId];
