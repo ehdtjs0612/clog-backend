@@ -211,35 +211,172 @@ router.get("/duplicate/club-name/:clubName", loginAuth, async (req, res, next) =
     }
 });
 
-// 동아리 가입 신청 승인 api
-router.post("/member", loginAuth, managerAuth, async (req, res, next) => {
-    const { userId, clubId } = req.body;
+// 동아리 가입 신청 api
+router.post("/join-request", loginAuth, async (req, res, next) => {
+    const { clubId } = req.body;
+    const userId = req.decoded.id;
     const result = {
         message: "",
         data: {}
     }
 
     try {
-        validate(userId, "userId").checkInput().isNumber().checkLength(1, 5);
-        validate(clubId, "clubId").checkInput().isNumber().checkLength(1, 5);
+        validate(clubId, "clubId").checkInput().isNumber();
 
+        // club_member_tb 테이블을 뒤져서 해당하는 사용자가 동아리에 이미 존재한다면 400 error를 던져줌
+        const selectClubMemberSql = `SELECT 
+                                             id 
+                                     FROM 
+                                             club_member_tb 
+                                     WHERE 
+                                             account_id = $1 AND club_id = $2`;
+        const selectClubMemberParam = [userId, clubId];
+        const selectClubMemberData = await pool.query(selectClubMemberSql, selectClubMemberParam);
+        if (selectClubMemberData.rowCount !== 0) {
+            throw new BadRequestException("이미 가입된 동아리입니다");
+        }
+
+        // join_request_tb 테이블을 뒤져서 해당하는 사용자가 이미 가입 요청된 상태이면 400 error를 던져줌
+        const selectIsJoinRequestSql = `SELECT 
+                                                id 
+                                        FROM 
+                                                join_request_tb 
+                                        WHERE 
+                                                account_id = $1 AND club_id = $2`;
+        const selectIsJoinRequestParam = [userId, clubId];
+        const selectIsJoinRequestData = await pool.query(selectIsJoinRequestSql, selectIsJoinRequestParam);
+        if (selectIsJoinRequestData.rowCount !== 0) {
+            throw new BadRequestException("이미 가입 신청이 되어있습니다");
+        }
+
+        const insertJoinRequestSql = `INSERT INTO 
+                                                join_request_tb (account_id, club_id) 
+                                      VALUES 
+                                                ($1, $2)`;
+        const insertJoinRequestParam = [userId, clubId];
+        const insertJoinRequestData = await pool.query(insertJoinRequestSql, insertJoinRequestParam);
+        if (insertJoinRequestData.rowCount !== 0) {
+            result.message = "가입 요청에 성공하였습니다";
+            return res.send(result);
+        }
+
+    } catch (error) {
+        if (error.constraint === CONSTRAINT.fkClub) {
+            return next(new BadRequestException("해당하는 동아리가 존재하지 않습니다"));
+        }
+        next(error);
+    }
+});
+
+// 동아리 가입 신청 리스트 조회 api
+router.get("/join-request/:clubId/list", loginAuth, managerAuth, async (req, res, next) => {
+    const { clubId } = req.params;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(clubId, "club-id").checkInput().isNumber();
+
+        const selectJoinRequestSql = `SELECT 
+                                            join_request_tb.id AS requestId,
+                                            join_request_tb.account_id AS id, 
+                                            account_tb.name, 
+                                            account_tb.personal_color AS personalColor, 
+                                            account_tb.entry_year AS entryYear, 
+                                            major_tb.name AS major, 
+                                            join_request_tb.created_at AS createdAt 
+                                      FROM 
+                                            join_request_tb 
+                                      JOIN 
+                                            account_tb ON join_request_tb.account_id = account_tb.id 
+                                      JOIN 
+                                            major_tb ON account_tb.major = major_tb.id
+                                      WHERE 
+                                            club_id = $1`;
+        const selectJoinRequestParam = [clubId];
+        const selectJoinRequestData = await pool.query(selectJoinRequestSql, selectJoinRequestParam);
+        if (selectJoinRequestData.rowCount !== 0) {
+            result.data = {
+                users: selectJoinRequestData.rows
+            }
+            return res.send(result);
+        }
+        result.message = "해당 동아리에 가입 요청 리스트가 비어있습니다";
+        res.send(result);
+
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 동아리 가입 신청 승인 api
+router.post("/member", loginAuth, managerAuth, async (req, res, next) => {
+    const { requestId } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    }
+    let pgClient = null;
+
+    try {
+        validate(requestId, "requestId").checkInput().isNumber();
+
+        pgClient = await pool.connect();
+        // 트랜잭션 시작
+        await pgClient.query("BEGIN");
+        const selectJoinRequestMemberSql = `SELECT 
+                                                    account_id AS userId, 
+                                                    club_id AS clubId 
+                                            FROM 
+                                                    join_request_tb 
+                                            WHERE 
+                                                    id = $1`;
+        const selectJoinRequestMemberParam = [requestId];
+        const selectJoinRequestData = await pgClient.query(selectJoinRequestMemberSql, selectJoinRequestMemberParam);
+        // 만약 가입 신청 테이블에 해당 요청 인덱스가 존재하지 않는다면 (가입 신청을 하지 않았다는 소리)
+        if (selectJoinRequestData.rowCount === 0) {
+            throw new BadRequestException("가입 신청 목록에 해당 유저가 존재하지 않습니다");
+        }
+        // 가입 요청 테이블에서 해당 요청 인덱스에 대한 userId와 clubId를 추출
+        const { userid, clubid } = selectJoinRequestData.rows[0];
+
+        // 추출한 userId와 clubId를 통해 club_member_tb로 유저를 삽입
         const insertMemberSql = `INSERT INTO 
                                             club_member_tb (account_id, club_id, position)
                                    VALUES
                                             ($1, $2, $3)`;
-        const insertedMemberParams = [userId, clubId, position.member];
-        const data = await pool.query(insertMemberSql, insertedMemberParams);
-        result.data = data;
+        const insertMemberParams = [userid, clubid, position.member];
+        await pgClient.query(insertMemberSql, insertMemberParams);
+
+        // 위 두 작업이 완료되면 가입 요청 테이블에 해당 요청 인덱스를 제거
+        const deleteJoinRequestMemberSql = `DELETE FROM 
+                                                join_request_tb 
+                                            WHERE 
+                                                id = $1`;
+        const deleteJoinRequestMemberParam = [requestId];
+        await pgClient.query(deleteJoinRequestMemberSql, deleteJoinRequestMemberParam);
+
+        // 트랜잭션 커밋
+        await pgClient.query("COMMIT");
         res.send(result);
 
     } catch (error) {
-        if (error.constraint === constraint.uniqueClubMember) {
+        if (pgClient) {
+            await pgClient.query("ROLLBACK");
+        }
+        if (error.constraint === CONSTRAINT.uniqueClubMember) {
             return next(new BadRequestException("해당하는 부원이 이미 존재합니다"));
         }
-        if (error.constraint === constraint.fkAccount) {
+        if (error.constraint === CONSTRAINT.fkAccount) {
             return next(new BadRequestException("해당하는 사용자가 존재하지 않습니다"));
         }
         next(error);
+    } finally {
+        if (pgClient) {
+            pgClient.release();
+        }
     }
 });
 
