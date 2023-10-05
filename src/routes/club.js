@@ -147,11 +147,11 @@ router.put("/", loginAuth, managerAuth, async (req, res, next) => {
 
     try {
         validate(name, "name").checkInput().checkClubNameRegex();
-        validate(cover, "cover").checkInput().checkLength(1, maxClubCoverLength);
-        validate(isAllowJoin, "isAllowJoin").checkInput().isBoolean();
+        validate(cover, "cover").checkInput().checkLength(1, club.maxClubCoverLength);
+        validate(isAllowJoin, "isAllowJoin").checkInput();
         validate(themeColor, "themeColor").checkInput().checkThemeColorRegex();
-        validate(bannerImg, "bannerImg").checkInput().checkLength(1, maxBannerImageLength);
-        validate(profileImg, "profileImg").checkInput().checkLength(1, maxProfileImageLength);
+        validate(bannerImg, "bannerImg").checkInput().checkLength(1, club.maxBannerImageLength);
+        validate(profileImg, "profileImg").checkInput().checkLength(1, club.maxProfileImageLength);
 
         const modifyClubProfileSql = `UPDATE 
                                             club_tb
