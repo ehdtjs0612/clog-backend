@@ -14,8 +14,9 @@ module.exports = async (req, res, next) => {
         const selectPositionParam = [userId, clubId];
         const selectPositionData = await pool.query(selectPositionSql, selectPositionParam);
         if (selectPositionData.rowCount !== 0) {
-            if (selectPositionData.rows[0].position !== position.member);
-            return next();
+            if (selectPositionData.rows[0].position !== position.member) {
+                return next();
+            };
         }
         throw new ForbbidenException("관리자 권한이 필요합니다");
 
