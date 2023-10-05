@@ -191,7 +191,13 @@ router.get("/duplicate/club-name/:clubName", loginAuth, async (req, res, next) =
     const removeSpaceClubName = clubName.replace(/\s+/g, ''); // 공백 제거
     try {
         validate(removeSpaceClubName, "club-name").checkInput().checkClubNameRegex();
-        const selectClubNameSql = `SELECT name FROM club_tb WHERE REPLACE(name, ' ', '') = $1`;
+
+        const selectClubNameSql = `SELECT 
+                                        name 
+                                   FROM 
+                                        club_tb 
+                                   WHERE 
+                                        REPLACE(name, ' ', '') = $1`;
         const selectClubNameParam = [removeSpaceClubName];
         const selectClubNameData = await pool.query(selectClubNameSql, selectClubNameParam);
         if (selectClubNameData.rowCount === 0) {
