@@ -1,4 +1,5 @@
 const pool = require("../../config/database/postgresql");
+const validate = require("../module/validation");
 const { position } = require("../module/global");
 const { ForbbidenException } = require('../module/customError');
 
@@ -7,6 +8,8 @@ module.exports = async (req, res, next) => {
     const clubId = req.params.clubId ?? req.body.clubId;
 
     try {
+        validate(clubId, "club-id").checkInput().isNumber();
+
         const selectPositionSql = `SELECT position FROM club_member_tb WHERE account_id = $1 AND club_id = $2`;
         const selectPositionParam = [userId, clubId];
         const selectPositionData = await pool.query(selectPositionSql, selectPositionParam);
