@@ -311,4 +311,73 @@ router.get("/join-request/:clubId/list", loginAuth, managerAuth, async (req, res
     }
 });
 
+// 동아리 가입 신청 승인 api
+router.post("/member", loginAuth, managerAuth, async (req, res, next) => {
+    const { requestId } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    }
+    let pgClient = null;
+
+    try {
+        validate(requestId, "requestId").checkInput().isNumber();
+
+        pgClient = await pool.connect();
+        // 트랜잭션 시작
+        await pgClient.query("BEGIN");
+        const selectJoinRequestMemberSql = `SELECT 
+                                                    account_id AS userId, 
+                                                    club_id AS clubId 
+                                            FROM 
+                                                    join_request_tb 
+                                            WHERE 
+                                                    id = $1`;
+        const selectJoinRequestMemberParam = [requestId];
+        const selectJoinRequestData = await pgClient.query(selectJoinRequestMemberSql, selectJoinRequestMemberParam);
+        // 만약 가입 신청 테이블에 해당 요청 인덱스가 존재하지 않는다면 (가입 신청을 하지 않았다는 소리)
+        if (selectJoinRequestData.rowCount === 0) {
+            throw new BadRequestException("가입 신청 목록에 해당 유저가 존재하지 않습니다");
+        }
+        // 가입 요청 테이블에서 해당 요청 인덱스에 대한 userId와 clubId를 추출
+        const { userid, clubid } = selectJoinRequestData.rows[0];
+
+        // 추출한 userId와 clubId를 통해 club_member_tb로 유저를 삽입
+        const insertMemberSql = `INSERT INTO 
+                                            club_member_tb (account_id, club_id, position)
+                                   VALUES
+                                            ($1, $2, $3)`;
+        const insertMemberParams = [userid, clubid, position.member];
+        await pgClient.query(insertMemberSql, insertMemberParams);
+
+        // 위 두 작업이 완료되면 가입 요청 테이블에 해당 요청 인덱스를 제거
+        const deleteJoinRequestMemberSql = `DELETE FROM 
+                                                join_request_tb 
+                                            WHERE 
+                                                id = $1`;
+        const deleteJoinRequestMemberParam = [requestId];
+        await pgClient.query(deleteJoinRequestMemberSql, deleteJoinRequestMemberParam);
+
+        // 트랜잭션 커밋
+        await pgClient.query("COMMIT");
+        res.send(result);
+
+    } catch (error) {
+        if (pgClient) {
+            await pgClient.query("ROLLBACK");
+        }
+        if (error.constraint === CONSTRAINT.uniqueClubMember) {
+            return next(new BadRequestException("해당하는 부원이 이미 존재합니다"));
+        }
+        if (error.constraint === CONSTRAINT.fkAccount) {
+            return next(new BadRequestException("해당하는 사용자가 존재하지 않습니다"));
+        }
+        next(error);
+    } finally {
+        if (pgClient) {
+            pgClient.release();
+        }
+    }
+});
+
 module.exports = router;
