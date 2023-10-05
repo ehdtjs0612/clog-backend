@@ -404,4 +404,45 @@ router.delete("/join-request", loginAuth, managerAuth, async (req, res, next) =>
     }
 });
 
+// 동아리 내부 개인 프로필 api
+router.get("/member/:clubId/profile", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
+    const { clubId } = req.params;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(clubId, "club-id").checkInput().isNumber();
+
+        const selectProfileSql = `SELECT
+                                        account_tb.name, 
+                                        account_tb.personal_color AS personalColor, 
+                                        position_tb.name AS position, 
+                                        account_tb.entry_year AS entryYear, 
+                                        major_tb.name AS major 
+                                  FROM 
+                                        club_member_tb 
+                                  JOIN 
+                                        account_tb ON club_member_tb.account_id = account_tb.id 
+                                  JOIN 
+                                        position_tb ON club_member_tb.position = position_tb.id 
+                                  JOIN 
+                                        major_tb ON account_tb.major = major_tb.id 
+                                  WHERE 
+                                        account_id = $1 AND club_id = $2;`;
+        const selectProfileParam = [userId, clubId];
+        const selectProfileData = await pool.query(selectProfileSql, selectProfileParam);
+        if (selectProfileData.rowCount === 0) {
+            throw new BadRequestException("해당 동아리에 가입되어있지 않습니다");
+        }
+        result.data = selectProfileData.rows[0];
+        res.send(result);
+
+    } catch (error) {
+        next(error);
+    }
+});
+
 module.exports = router;
