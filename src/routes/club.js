@@ -268,4 +268,47 @@ router.post("/join-request", loginAuth, async (req, res, next) => {
     }
 });
 
+// 동아리 가입 신청 리스트 조회 api
+router.get("/join-request/:clubId/list", loginAuth, managerAuth, async (req, res, next) => {
+    const { clubId } = req.params;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(clubId, "club-id").checkInput().isNumber();
+
+        const selectJoinRequestSql = `SELECT 
+                                            join_request_tb.id AS requestId,
+                                            join_request_tb.account_id AS id, 
+                                            account_tb.name, 
+                                            account_tb.personal_color AS personalColor, 
+                                            account_tb.entry_year AS entryYear, 
+                                            major_tb.name AS major, 
+                                            join_request_tb.created_at AS createdAt 
+                                      FROM 
+                                            join_request_tb 
+                                      JOIN 
+                                            account_tb ON join_request_tb.account_id = account_tb.id 
+                                      JOIN 
+                                            major_tb ON account_tb.major = major_tb.id
+                                      WHERE 
+                                            club_id = $1`;
+        const selectJoinRequestParam = [clubId];
+        const selectJoinRequestData = await pool.query(selectJoinRequestSql, selectJoinRequestParam);
+        if (selectJoinRequestData.rowCount !== 0) {
+            result.data = {
+                users: selectJoinRequestData.rows
+            }
+            return res.send(result);
+        }
+        result.message = "해당 동아리에 가입 요청 리스트가 비어있습니다";
+        res.send(result);
+
+    } catch (error) {
+        next(error);
+    }
+});
+
 module.exports = router;
