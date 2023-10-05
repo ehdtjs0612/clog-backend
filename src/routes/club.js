@@ -211,33 +211,58 @@ router.get("/duplicate/club-name/:clubName", loginAuth, async (req, res, next) =
     }
 });
 
-// 동아리 가입 신청 승인 api
-router.post("/member", loginAuth, managerAuth, async (req, res, next) => {
-    const { userId, clubId } = req.body;
+// 동아리 가입 신청 api
+router.post("/join-request", loginAuth, async (req, res, next) => {
+    const { clubId } = req.body;
+    const userId = req.decoded.id;
     const result = {
         message: "",
         data: {}
     }
 
     try {
-        validate(userId, "userId").checkInput().isNumber().checkLength(1, 5);
-        validate(clubId, "clubId").checkInput().isNumber().checkLength(1, 5);
+        validate(clubId, "clubId").checkInput().isNumber();
 
-        const insertMemberSql = `INSERT INTO 
-                                            club_member_tb (account_id, club_id, position)
-                                   VALUES
-                                            ($1, $2, $3)`;
-        const insertedMemberParams = [userId, clubId, position.member];
-        const data = await pool.query(insertMemberSql, insertedMemberParams);
-        result.data = data;
-        res.send(result);
+        // club_member_tb 테이블을 뒤져서 해당하는 사용자가 동아리에 이미 존재한다면 400 error를 던져줌
+        const selectClubMemberSql = `SELECT 
+                                             id 
+                                     FROM 
+                                             club_member_tb 
+                                     WHERE 
+                                             account_id = $1 AND club_id = $2`;
+        const selectClubMemberParam = [userId, clubId];
+        const selectClubMemberData = await pool.query(selectClubMemberSql, selectClubMemberParam);
+        if (selectClubMemberData.rowCount !== 0) {
+            throw new BadRequestException("이미 가입된 동아리입니다");
+        }
+
+        // join_request_tb 테이블을 뒤져서 해당하는 사용자가 이미 가입 요청된 상태이면 400 error를 던져줌
+        const selectIsJoinRequestSql = `SELECT 
+                                                id 
+                                        FROM 
+                                                join_request_tb 
+                                        WHERE 
+                                                account_id = $1 AND club_id = $2`;
+        const selectIsJoinRequestParam = [userId, clubId];
+        const selectIsJoinRequestData = await pool.query(selectIsJoinRequestSql, selectIsJoinRequestParam);
+        if (selectIsJoinRequestData.rowCount !== 0) {
+            throw new BadRequestException("이미 가입 신청이 되어있습니다");
+        }
+
+        const insertJoinRequestSql = `INSERT INTO 
+                                                join_request_tb (account_id, club_id) 
+                                      VALUES 
+                                                ($1, $2)`;
+        const insertJoinRequestParam = [userId, clubId];
+        const insertJoinRequestData = await pool.query(insertJoinRequestSql, insertJoinRequestParam);
+        if (insertJoinRequestData.rowCount !== 0) {
+            result.message = "가입 요청에 성공하였습니다";
+            return res.send(result);
+        }
 
     } catch (error) {
-        if (error.constraint === constraint.uniqueClubMember) {
-            return next(new BadRequestException("해당하는 부원이 이미 존재합니다"));
-        }
-        if (error.constraint === constraint.fkAccount) {
-            return next(new BadRequestException("해당하는 사용자가 존재하지 않습니다"));
+        if (error.constraint === CONSTRAINT.fkClub) {
+            return next(new BadRequestException("해당하는 동아리가 존재하지 않습니다"));
         }
         next(error);
     }
