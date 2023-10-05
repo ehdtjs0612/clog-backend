@@ -7,7 +7,7 @@ const managerAuth = require("../middleware/managerAuth");
 const { BadRequestException } = require('../module/customError');
 const { club } = require("../module/global");
 const { position } = require("../module/global");
-const constraint = require("../module/constraint");
+const CONSTRAINT = require("../module/constraint");
 
 // 동아리 생성 api
 router.post("/", loginAuth, async (req, res, next) => {
@@ -64,16 +64,16 @@ router.post("/", loginAuth, async (req, res, next) => {
         if (pgClient) {
             await pgClient.query("ROLLBACK");
         }
-        if (error.constraint === constraint.uniqueClubName) {
+        if (error.constraint === CONSTRAINT.uniqueClubName) {
             next(new BadRequestException("이미 존재하는 동아리 이름입니다"))
         }
-        if (error.constraint === constraint.fkBelong) {
+        if (error.constraint === CONSTRAINT.fkBelong) {
             next(new BadRequestException("해당하는 소속이 존재하지 않습니다"));
         }
-        if (error.constraint === constraint.fkBigCategory) {
+        if (error.constraint === CONSTRAINT.fkBigCategory) {
             next(new BadRequestException("해당하는 대분류가 존재하지 않습니다"))
         }
-        if (error.constraint === constraint.fkSmallCategory) {
+        if (error.constraint === CONSTRAINT.fkSmallCategory) {
             next(new BadRequestException("해당하는 소분류가 존재하지 않습니다"));
         }
         next(error);
@@ -86,14 +86,14 @@ router.post("/", loginAuth, async (req, res, next) => {
 });
 
 // 동아리 프로필 조회 api
-router.get("/:clubId/profile", async (req, res, next) => {
+router.get("/:clubId/profile", loginAuth, async (req, res, next) => {
     const { clubId } = req.params;
     const result = {
         message: "",
         data: {}
     }
     try {
-        validate(clubId, "clubId").checkInput().isNumber().checkLength(1, 5);
+        validate(clubId, "clubId").checkInput().isNumber();
 
         const selectedClubSql = `SELECT 
                                         club_tb.name AS name, 
@@ -147,11 +147,11 @@ router.put("/", loginAuth, managerAuth, async (req, res, next) => {
 
     try {
         validate(name, "name").checkInput().checkClubNameRegex();
-        validate(cover, "cover").checkInput().checkLength(1, maxClubCoverLength);
-        validate(isAllowJoin, "isAllowJoin").checkInput().isBoolean();
+        validate(cover, "cover").checkInput().checkLength(1, club.maxClubCoverLength);
+        validate(isAllowJoin, "isAllowJoin").checkInput();
         validate(themeColor, "themeColor").checkInput().checkThemeColorRegex();
-        validate(bannerImg, "bannerImg").checkInput().checkLength(1, maxBannerImageLength);
-        validate(profileImg, "profileImg").checkInput().checkLength(1, maxProfileImageLength);
+        validate(bannerImg, "bannerImg").checkInput().checkLength(1, club.maxBannerImageLength);
+        validate(profileImg, "profileImg").checkInput().checkLength(1, club.maxProfileImageLength);
 
         const modifyClubProfileSql = `UPDATE 
                                             club_tb
@@ -191,7 +191,13 @@ router.get("/duplicate/club-name/:clubName", loginAuth, async (req, res, next) =
     const removeSpaceClubName = clubName.replace(/\s+/g, ''); // 공백 제거
     try {
         validate(removeSpaceClubName, "club-name").checkInput().checkClubNameRegex();
-        const selectClubNameSql = `SELECT name FROM club_tb WHERE REPLACE(name, ' ', '') = $1`;
+
+        const selectClubNameSql = `SELECT 
+                                        name 
+                                   FROM 
+                                        club_tb 
+                                   WHERE 
+                                        REPLACE(name, ' ', '') = $1`;
         const selectClubNameParam = [removeSpaceClubName];
         const selectClubNameData = await pool.query(selectClubNameSql, selectClubNameParam);
         if (selectClubNameData.rowCount === 0) {
