@@ -22,11 +22,11 @@ router.post("/", loginAuth, async (req, res, next) => {
     let pgClient = null;
 
     try {
-        validate(belong, "belong").checkInput().isNumber().checkLength(1, club.maxClubBelongLength);
-        validate(bigCategory, "bigCategory").checkInput().isNumber().checkLength(1, club.maxClubBigCategoryLength);
-        validate(smallCategory, "smallCategory").checkInput().isNumber().checkLength(1, club.maxClubSmallCategoryLength);
+        validate(belong, "belong").checkInput().isNumber().checkLength(1, club.MAX_CLUB_BELONG_LENGTH);
+        validate(bigCategory, "bigCategory").checkInput().isNumber().checkLength(1, club.MAX_CLUB_BIG_CATEGORY_LENGTH);
+        validate(smallCategory, "smallCategory").checkInput().isNumber().checkLength(1, club.MAX_CLUB_SMALL_CATEGORY_LENGTH);
         validate(name, "name").checkInput().checkClubNameRegex();
-        validate(cover, "cover").checkInput().checkLength(1, club.maxClubCoverLength);
+        validate(cover, "cover").checkInput().checkLength(1, club.MAX_CLUB_COVER_LENGTH);
         validate(isRecruit, "isRecruit").checkInput().isBoolean();
         validate(themeColor, "themeColor").checkInput().checkThemeColorRegex();
 
@@ -48,7 +48,7 @@ router.post("/", loginAuth, async (req, res, next) => {
                                         club_member_tb (account_id, club_id, position) 
                                  VALUES 
                                         ($1, $2, $3)`;
-        const insertMemberParam = [userId, createdClubId, position.president];
+        const insertMemberParam = [userId, createdClubId, position.PERSIDENT];
         await pool.query(insertMemberSql, insertMemberParam);
 
         // 트랜잭션 커밋
@@ -64,16 +64,16 @@ router.post("/", loginAuth, async (req, res, next) => {
         if (pgClient) {
             await pgClient.query("ROLLBACK");
         }
-        if (error.constraint === CONSTRAINT.uniqueClubName) {
+        if (error.constraint === CONSTRAINT.UNIQUE_CLUB_NAME) {
             next(new BadRequestException("이미 존재하는 동아리 이름입니다"))
         }
-        if (error.constraint === CONSTRAINT.fkBelong) {
+        if (error.constraint === CONSTRAINT.FK_BELONG) {
             next(new BadRequestException("해당하는 소속이 존재하지 않습니다"));
         }
-        if (error.constraint === CONSTRAINT.fkBigCategory) {
+        if (error.constraint === CONSTRAINT.FK_BIG_CATEGORY) {
             next(new BadRequestException("해당하는 대분류가 존재하지 않습니다"))
         }
-        if (error.constraint === CONSTRAINT.fkSmallCategory) {
+        if (error.constraint === CONSTRAINT.FK_SMALL_CATEGORY) {
             next(new BadRequestException("해당하는 소분류가 존재하지 않습니다"));
         }
         next(error);
@@ -147,11 +147,11 @@ router.put("/", loginAuth, managerAuth, async (req, res, next) => {
 
     try {
         validate(name, "name").checkInput().checkClubNameRegex();
-        validate(cover, "cover").checkInput().checkLength(1, club.maxClubCoverLength);
+        validate(cover, "cover").checkInput().checkLength(1, club.MAX_CLUB_COVER_LENGTH);
         validate(isAllowJoin, "isAllowJoin").checkInput();
         validate(themeColor, "themeColor").checkInput().checkThemeColorRegex();
-        validate(bannerImg, "bannerImg").checkInput().checkLength(1, club.maxBannerImageLength);
-        validate(profileImg, "profileImg").checkInput().checkLength(1, club.maxProfileImageLength);
+        validate(bannerImg, "bannerImg").checkInput().checkLength(1, club.MAX_BANNER_IMAGE_LENGTH);
+        validate(profileImg, "profileImg").checkInput().checkLength(1, club.MAX_PROFILE_IMAGE_LENGTH);
 
         const modifyClubProfileSql = `UPDATE 
                                             club_tb
@@ -261,7 +261,7 @@ router.post("/join-request", loginAuth, async (req, res, next) => {
         }
 
     } catch (error) {
-        if (error.constraint === CONSTRAINT.fkClub) {
+        if (error.constraint === CONSTRAINT.FK_CLUB) {
             return next(new BadRequestException("해당하는 동아리가 존재하지 않습니다"));
         }
         next(error);
@@ -347,7 +347,7 @@ router.post("/member", loginAuth, managerAuth, async (req, res, next) => {
                                             club_member_tb (account_id, club_id, position)
                                    VALUES
                                             ($1, $2, $3)`;
-        const insertMemberParams = [userid, clubid, position.member];
+        const insertMemberParams = [userid, clubid, position.MEMBER];
         await pgClient.query(insertMemberSql, insertMemberParams);
 
         // 위 두 작업이 완료되면 가입 요청 테이블에 해당 요청 인덱스를 제거
@@ -369,7 +369,7 @@ router.post("/member", loginAuth, managerAuth, async (req, res, next) => {
         if (error.constraint === CONSTRAINT.uniqueClubMember) {
             return next(new BadRequestException("해당하는 부원이 이미 존재합니다"));
         }
-        if (error.constraint === CONSTRAINT.fkAccount) {
+        if (error.constraint === CONSTRAINT.FK_ACCOUNT) {
             return next(new BadRequestException("해당하는 사용자가 존재하지 않습니다"));
         }
         next(error);

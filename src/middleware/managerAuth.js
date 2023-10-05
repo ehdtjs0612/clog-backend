@@ -14,7 +14,7 @@ module.exports = async (req, res, next) => {
         const selectPositionParam = [userId, clubId];
         const selectPositionData = await pool.query(selectPositionSql, selectPositionParam);
         if (selectPositionData.rowCount !== 0) {
-            if (selectPositionData.rows[0].position !== position.member) {
+            if (selectPositionData.rows[0].position !== position.MEMBER) {
                 return next();
             };
         }
