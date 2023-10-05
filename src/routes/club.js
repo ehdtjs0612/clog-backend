@@ -86,14 +86,14 @@ router.post("/", loginAuth, async (req, res, next) => {
 });
 
 // 동아리 프로필 조회 api
-router.get("/:clubId/profile", async (req, res, next) => {
+router.get("/:clubId/profile", loginAuth, async (req, res, next) => {
     const { clubId } = req.params;
     const result = {
         message: "",
         data: {}
     }
     try {
-        validate(clubId, "clubId").checkInput().isNumber().checkLength(1, 5);
+        validate(clubId, "clubId").checkInput().isNumber();
 
         const selectedClubSql = `SELECT 
                                         club_tb.name AS name, 
