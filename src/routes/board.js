@@ -4,12 +4,35 @@ const pool = require('../../config/database/postgresql');
 const loginAuth = require('../middleware/auth/loginAuth');
 const managerAuth = require('../middleware/auth/managerAuth');
 const validate = require('../module/validation');
-const { board } = require("../module/global");
 const CONSTRAINT = require('../module/constraint');
+const { board } = require("../module/global");
 const { BadRequestException } = require('../module/customError');
 
-// router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
-// });
+// 게시판 리스트 조회 api
+router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
+    const { clubId } = req.params;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(clubId, "clubId").checkInput().isNumber();
+
+        const selectBoardListSql = `SELECT id, name FROM club_board_tb WHERE club_id = $1`;
+        const selectBoardListParam = [clubId];
+        const selectBoardListData = await pool.query(selectBoardListSql, selectBoardListParam);
+        if (selectBoardListData.rowCount !== 0) {
+            result.data = {
+                boards: selectBoardListData.rows
+            }
+            res.send(result);
+        }
+    }
+    catch (error) {
+        next(error);
+    }
+});
 
 // 게시판 생성 api
 router.post("/", loginAuth, managerAuth, async (req, res, next) => {
