@@ -20,6 +20,10 @@ module.exports = {
         MAX_FIXED_NOTICE_COUNT_PER_PAGE: 5
     },
 
+    board: {
+        MAX_BOARD_LENGTH: 16
+    },
+
     position: {
         PERSIDENT: 0,   // 회장
         MANAGER: 1,     // 운영진

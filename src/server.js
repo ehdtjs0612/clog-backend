@@ -10,6 +10,7 @@ const authApi = require("./routes/auth");
 const uploadApi = require("./routes/upload");
 const clubApi = require("./routes/club");
 const noticeApi = require("./routes/notice");
+const boardApi = require("./routes/board");
 
 const errorHandling = require("./middleware/errorHandling");
 
@@ -26,6 +27,7 @@ app.use("/auth", authApi);
 app.use("/upload", uploadApi);
 app.use("/club", clubApi);
 app.use("/notice", noticeApi);
+app.use("/board", boardApi);
 
 // error handling muddleware
 app.use(errorHandling());

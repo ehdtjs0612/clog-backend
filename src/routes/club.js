@@ -564,4 +564,34 @@ router.put("/position", loginAuth, presidentAuth, async (req, res, next) => {
     }
 });
 
+// 배너 불러오는 api
+router.get("/:clubId/banner", loginAuth, async (req, res, next) => {
+    const { clubId } = req.params;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(clubId, "club-id").checkInput().isNumber();
+
+        const selectClubBannerSql = `SELECT 
+                                            banner_img AS banner 
+                                     FROM 
+                                            club_tb 
+                                     WHERE 
+                                            id = $1`;
+        const selectClubBannerParam = [clubId];
+        const selectClubBannerData = await pool.query(selectClubBannerSql, selectClubBannerParam);
+        if (selectClubBannerData.rowCount !== 0) {
+            result.data = selectClubBannerData.rows[0].banner;
+            return res.send(result);
+        }
+        throw new BadRequestException("해당하는 동아리가 존재하지 않습니다");
+
+    } catch (error) {
+        next(error);
+    }
+});
+
 module.exports = router;
