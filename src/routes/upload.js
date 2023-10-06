@@ -1,5 +1,5 @@
 const router = require("express").Router();
-const loginAuth = require("../middleware/loginAuth");
+const loginAuth = require("../middleware/auth/loginAuth");
 
 // 동아리 프로필 이미지 업로드
 router.post("/club-profile", loginAuth, async (req, res, next) => {

@@ -2,8 +2,9 @@
 const router = require("express").Router();
 const pool = require("../../config/database/postgresql");
 const validate = require('../module/validation');
-const loginAuth = require("../middleware/loginAuth");
-const managerAuth = require("../middleware/managerAuth");
+const loginAuth = require("../middleware/auth/loginAuth");
+const managerAuth = require("../middleware/auth/managerAuth");
+const presidentAuth = require("../middleware/auth/presidentAuth");
 const { BadRequestException } = require('../module/customError');
 const { club } = require("../module/global");
 const { position } = require("../module/global");
