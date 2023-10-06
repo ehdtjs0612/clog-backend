@@ -7,7 +7,7 @@ const managerAuth = require("../middleware/auth/managerAuth");
 const presidentAuth = require("../middleware/auth/presidentAuth");
 const { BadRequestException } = require('../module/customError');
 const { club } = require("../module/global");
-const { position } = require("../module/global");
+const { position: POSITION } = require("../module/global");
 const CONSTRAINT = require("../module/constraint");
 
 // 동아리 생성 api
@@ -49,7 +49,7 @@ router.post("/", loginAuth, async (req, res, next) => {
                                         club_member_tb (account_id, club_id, position) 
                                  VALUES 
                                         ($1, $2, $3)`;
-        const insertMemberParam = [userId, createdClubId, position.PERSIDENT];
+        const insertMemberParam = [userId, createdClubId, POSITION.PERSIDENT];
         await pool.query(insertMemberSql, insertMemberParam);
 
         // 트랜잭션 커밋
@@ -348,7 +348,7 @@ router.post("/member", loginAuth, managerAuth, async (req, res, next) => {
                                             club_member_tb (account_id, club_id, position)
                                    VALUES
                                             ($1, $2, $3)`;
-        const insertMemberParams = [userid, clubid, position.MEMBER];
+        const insertMemberParams = [userid, clubid, POSITION.MEMBER];
         await pgClient.query(insertMemberSql, insertMemberParams);
 
         // 위 두 작업이 완료되면 가입 요청 테이블에 해당 요청 인덱스를 제거
