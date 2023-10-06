@@ -445,4 +445,45 @@ router.get("/member/:clubId/profile", loginAuth, async (req, res, next) => {
     }
 });
 
+// 동아리 내 멤버 리스트 api
+router.get("/member/:clubId/list", loginAuth, async (req, res, next) => {
+    const { clubId } = req.params;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(clubId, "club-id").checkInput().isNumber();
+
+        const selectMemberListSql = `SELECT 
+                                            club_member_tb.account_id, 
+                                            major_tb.name AS major, 
+                                            account_tb.entry_year AS entryYear, 
+                                            account_tb.name, 
+                                            account_tb.personal_color AS personalColor, 
+                                            to_char(club_member_tb.created_at, 'yyyy.mm.dd') AS createdAt 
+                                     FROM 
+                                            club_member_tb 
+                                     JOIN 
+                                            account_tb ON club_member_tb.account_id = account_tb.id 
+                                     JOIN 
+                                            major_tb ON account_tb.major = major_tb.id 
+                                     WHERE 
+                                            club_id = $1;`;
+        const selectMemberListParam = [clubId];
+        const selectMemberListData = await pool.query(selectMemberListSql, selectMemberListParam);
+        if (selectMemberListData.rowCount === 0) {
+            throw new BadRequestException("해당하는 동아리가 존재하지 않습니다");
+        }
+        result.data = {
+            users: selectMemberListData.rows
+        };
+        res.send(result);
+
+    } catch (error) {
+        next(error);
+    }
+});
+
 module.exports = router;
