@@ -2,11 +2,12 @@
 const router = require("express").Router();
 const pool = require("../../config/database/postgresql");
 const validate = require('../module/validation');
-const loginAuth = require("../middleware/loginAuth");
-const managerAuth = require("../middleware/managerAuth");
+const loginAuth = require("../middleware/auth/loginAuth");
+const managerAuth = require("../middleware/auth/managerAuth");
+const presidentAuth = require("../middleware/auth/presidentAuth");
 const { BadRequestException } = require('../module/customError');
 const { club } = require("../module/global");
-const { position } = require("../module/global");
+const { position: POSITION } = require("../module/global");
 const CONSTRAINT = require("../module/constraint");
 
 // 동아리 생성 api
@@ -48,7 +49,7 @@ router.post("/", loginAuth, async (req, res, next) => {
                                         club_member_tb (account_id, club_id, position) 
                                  VALUES 
                                         ($1, $2, $3)`;
-        const insertMemberParam = [userId, createdClubId, position.PERSIDENT];
+        const insertMemberParam = [userId, createdClubId, POSITION.PERSIDENT];
         await pool.query(insertMemberSql, insertMemberParam);
 
         // 트랜잭션 커밋
@@ -347,7 +348,7 @@ router.post("/member", loginAuth, managerAuth, async (req, res, next) => {
                                             club_member_tb (account_id, club_id, position)
                                    VALUES
                                             ($1, $2, $3)`;
-        const insertMemberParams = [userid, clubid, position.MEMBER];
+        const insertMemberParams = [userid, clubid, POSITION.MEMBER];
         await pgClient.query(insertMemberSql, insertMemberParams);
 
         // 위 두 작업이 완료되면 가입 요청 테이블에 해당 요청 인덱스를 제거
@@ -442,6 +443,124 @@ router.get("/member/:clubId/profile", loginAuth, async (req, res, next) => {
 
     } catch (error) {
         next(error);
+    }
+});
+
+// 동아리 내 멤버 리스트 api
+router.get("/member/:clubId/list", loginAuth, async (req, res, next) => {
+    const { clubId } = req.params;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(clubId, "club-id").checkInput().isNumber();
+
+        const selectMemberListSql = `SELECT 
+                                            club_member_tb.account_id, 
+                                            major_tb.name AS major, 
+                                            account_tb.entry_year AS entryYear, 
+                                            account_tb.name, 
+                                            account_tb.personal_color AS personalColor, 
+                                            to_char(club_member_tb.created_at, 'yyyy.mm.dd') AS createdAt 
+                                     FROM 
+                                            club_member_tb 
+                                     JOIN 
+                                            account_tb ON club_member_tb.account_id = account_tb.id 
+                                     JOIN 
+                                            major_tb ON account_tb.major = major_tb.id 
+                                     WHERE 
+                                            club_id = $1;`;
+        const selectMemberListParam = [clubId];
+        const selectMemberListData = await pool.query(selectMemberListSql, selectMemberListParam);
+        if (selectMemberListData.rowCount === 0) {
+            throw new BadRequestException("해당하는 동아리가 존재하지 않습니다");
+        }
+        result.data = {
+            users: selectMemberListData.rows
+        };
+        res.send(result);
+
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 직급 변경시켜주는 api
+router.put("/position", loginAuth, presidentAuth, async (req, res, next) => {
+    const { userId, clubId, position } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    };
+    let pgClient = null;
+
+    try {
+        validate(userId, "user-id").checkInput().isNumber();
+        validate(clubId, "club-id").checkInput().isNumber();
+        validate(position, "position").checkInput().isNumber();
+
+        pgClient = await pool.connect();
+
+        // 1. 회장이 권한을 다른사람에게 넘길 경우, 먼저 기존 회장의(본인의) 직급을 동아리 부원으로 변환시켜주고
+        if (position === '0') {
+            // 트랜잭션 시작
+            await pgClient.query("BEGIN");
+            const changePositionSql = `UPDATE
+                                                club_member_tb
+                                       SET
+                                                position = $1
+                                       WHERE
+                                                account_id = $2 AND club_id = $3`;
+            const changePositionParam = [POSITION.MEMBER, req.decoded.id, clubId];
+            await pgClient.query(changePositionSql, changePositionParam);
+            // 2. 그 다음, 유저에게 회장 권한을 부여
+            const updatePositionSql = `UPDATE 
+                                                club_member_tb
+                                       SET 
+                                                position = $1 
+                                       WHERE 
+                                                account_id = $2 AND club_id = $3`;
+            const updatePositionParam = [position, userId, clubId];
+            const updatePositionData = await pgClient.query(updatePositionSql, updatePositionParam);
+            if (updatePositionData.rowCount !== 0) {
+                await pgClient.query("COMMIT");
+                result.message = "변경이 완료되었습니다";
+
+                return res.send(result);
+            }
+            throw new BadRequestException("해당하는 유저가 존재하지 않습니다");
+        }
+
+        // 그 외엔 다른 유저의 직급을 변경
+        const updatePositionSql = `UPDATE 
+                                            club_member_tb
+                                   SET 
+                                            position = $1 
+                                   WHERE 
+                                            account_id = $2 AND club_id = $3`;
+        const updatePositionParam = [position, userId, clubId];
+        const updatePositionData = await pgClient.query(updatePositionSql, updatePositionParam);
+        if (updatePositionData.rowCount !== 0) {
+            result.message = "변경이 완료되었습니다";
+            return res.send(result);
+        }
+        throw new BadRequestException("해당하는 유저가 존재하지 않습니다");
+
+    } catch (error) {
+        if (pgClient) {
+            await pgClient.query("ROLLBACK");
+        }
+        if (error.constraint === CONSTRAINT.FK_POSITION) {
+            return next(new BadRequestException("해당하는 직급이 존재하지 않습니다"));
+        }
+        next(error);
+
+    } finally {
+        if (pgClient) {
+            pgClient.release();
+        }
     }
 });
 
