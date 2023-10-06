@@ -35,5 +35,10 @@ module.exports = {
         prReply : "/promotion/reply",
         gradeUpdate : "/club/position",
         joinAccept : "/club/member"
+    },
+
+    notification : {
+        idLength : 24,
+        limit : 5
     }
 }
