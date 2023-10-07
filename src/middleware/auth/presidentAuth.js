@@ -1,6 +1,6 @@
 const pool = require("../../../config/database/postgresql");
 const validate = require("../../module/validation");
-const { position: POSITION } = require("../../module/global");
+const { POSITION: POSITION } = require("../../module/global");
 const { ForbbidenException } = require('../../module/customError');
 
 module.exports = async (req, res, next) => {
