@@ -96,4 +96,30 @@ router.put("/", loginAuth, managerAuth, async (req, res, next) => {
     }
 });
 
+router.delete("/", managerAuth, async (req, res, next) => {
+    const { boardId } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(boardId, "boardId").checkInput().isNumber();
+
+        const deleteBoardSql = `DELETE FROM
+                                            club_board_tb
+                                WHERE
+                                            id = $1`;
+        const deleteBoardParam = [boardId];
+        const deleteBoardData = await pool.query(deleteBoardSql, deleteBoardParam);
+        if (deleteBoardData.rowCount !== 0) {
+            return res.send(result);
+        }
+        throw new BadRequestException("해당하는 게시판이 존재하지 않습니다");
+
+    } catch (error) {
+        next(error);
+    }
+});
+
 module.exports = router;
