@@ -4,12 +4,12 @@ const client = require("mongodb").MongoClient
 const validate = require("../module/validation")
 const { notification } = require("../module/global")
 const { BadRequestException } = require("../module/customError")
-const loginAuth = require("../middleware/loginAuth")
+const loginAuth = require("../middleware/auth/loginAuth");
 const notificationSentence = require("../module/notificationSentence")
 const { ObjectId } = require("mongodb")
 
 // 알림 목록 조회
-router.get("/list", loginAuth, async (req, res, next) => { 
+router.get("/list", loginAuth, async (req, res, next) => {
     const userId = req.decoded.id
     const result = {
         message: "",
@@ -21,8 +21,8 @@ router.get("/list", loginAuth, async (req, res, next) => {
     try {
         conn = await client.connect(process.env.MONGODB_URL)
 
-        const filter = {user_id : userId}
-        const sort = {_id : -1}
+        const filter = { user_id: userId }
+        const sort = { _id: -1 }
         const data = await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).find(filter).sort(sort).limit(notification.limit).toArray()
         result.data = notificationSentence(data)
         result.message = "알림 목록 조회 성공"
@@ -46,8 +46,8 @@ router.post("/read", loginAuth, async (req, res, next) => {
         validate(notificationId, "notificationId").checkInput().checkLength(notification.idLength, notification.idLength)
         conn = await client.connect(process.env.MONGODB_URL)
 
-        const filter = {_id: new ObjectId(notificationId)}
-        const update = {$set: {is_read : true}}
+        const filter = { _id: new ObjectId(notificationId) }
+        const update = { $set: { is_read: true } }
         const data = await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).updateOne(filter, update)
         console.log(data)
 
@@ -72,19 +72,19 @@ router.post("/read-all", loginAuth, async (req, res, next) => {
     try {
         conn = await client.connect(process.env.MONGODB_URL)
 
-        const userFilter = {user_id: userId}
-        const isReadFilter = {is_read: false}
-        const update = {$set: {is_read : true}}
+        const userFilter = { user_id: userId }
+        const isReadFilter = { is_read: false }
+        const update = { $set: { is_read: true } }
         const pipeline = [
-            { $match : userFilter },
-            { $limit : notification.limit },
-            { $match : isReadFilter},
-            { $project : { _id : 1 }}
+            { $match: userFilter },
+            { $limit: notification.limit },
+            { $match: isReadFilter },
+            { $project: { _id: 1 } }
         ]
 
         const find = await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).aggregate(pipeline).toArray()
-        const idList = find.map( elem => elem._id)
-        const data = await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).updateMany({_id : {$in : idList}}, update)
+        const idList = find.map(elem => elem._id)
+        const data = await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).updateMany({ _id: { $in: idList } }, update)
 
         result.message = "알림 모두 읽음 처리 성공"
 
@@ -108,14 +108,14 @@ router.get("/count", loginAuth, async (req, res, next) => {
 
     try {
         conn = await client.connect(process.env.MONGODB_URL)
-        
-        const userFilter = {user_id : userId}
-        const isReadFilter = {is_read : false}
+
+        const userFilter = { user_id: userId }
+        const isReadFilter = { is_read: false }
         const pipeline = [
-            { $match : userFilter },
-            { $limit : notification.limit },
-            { $match : isReadFilter},
-            { $count : "count" }
+            { $match: userFilter },
+            { $limit: notification.limit },
+            { $match: isReadFilter },
+            { $count: "count" }
         ]
         const data = await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).aggregate(pipeline).toArray()
         result.data = data
