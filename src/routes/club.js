@@ -48,7 +48,7 @@ router.post("/", loginAuth, async (req, res, next) => {
                                         club_member_tb (account_id, club_id, position) 
                                  VALUES 
                                         ($1, $2, $3)`;
-        const insertMemberParam = [userId, createdClubId, POSITION.PERSIDENT];
+        const insertMemberParam = [userId, createdClubId, POSITION.PRESIDENT];
         await pool.query(insertMemberSql, insertMemberParam);
 
         // 트랜잭션 커밋
@@ -340,14 +340,13 @@ router.post("/member", loginAuth, managerAuth, async (req, res, next) => {
             throw new BadRequestException("가입 신청 목록에 해당 유저가 존재하지 않습니다");
         }
         // 가입 요청 테이블에서 해당 요청 인덱스에 대한 userId와 clubId를 추출
-        const { userid, clubid } = selectJoinRequestData.rows[0];
-
+        const { userId, clubId } = selectJoinRequestData.rows[0];
         // 추출한 userId와 clubId를 통해 club_member_tb로 유저를 삽입
         const insertMemberSql = `INSERT INTO 
                                             club_member_tb (account_id, club_id, position)
                                    VALUES
                                             ($1, $2, $3)`;
-        const insertMemberParams = [userid, clubid, POSITION.MEMBER];
+        const insertMemberParams = [userId, clubId, POSITION.MEMBER];
         await pgClient.query(insertMemberSql, insertMemberParams);
 
         // 위 두 작업이 완료되면 가입 요청 테이블에 해당 요청 인덱스를 제거
