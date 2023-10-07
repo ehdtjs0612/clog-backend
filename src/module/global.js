@@ -1,15 +1,15 @@
 module.exports = {
-    account: {
+    ACCOUNT: {
         MAX_EMAIL_LENGTH: 60,
         MAX_PW_LENGTH: 60
     },
 
-    auth: {
+    AUTH: {
         CERTIFIED_LENGTH: 5,
         CERTIFIED_EXPIRE_TIME: 180,
     },
 
-    club: {
+    CLUB: {
         MAX_CLUB_COVER_LENGTH: 500,
         MAX_CLUB_BELONG_LENGTH: 5,
         MAX_CLUB_BIG_CATEGORY_LENGTH: 5,
@@ -17,15 +17,16 @@ module.exports = {
         MAX_BANNER_IMAGE_LENGTH: 20000,
         MAX_PROFILE_IMAGE_LENGTH: 20000,
         MAX_POST_COUNT_PER_PAGE: 10,
-        MAX_FIXED_NOTICE_COUNT_PER_PAGE: 5
+        MAX_FIXED_NOTICE_COUNT_PER_PAGE: 5,
+        MAX_BOARD_COUNT: 10
     },
 
-    board: {
+    BOARD: {
         MAX_BOARD_LENGTH: 16
     },
 
-    position: {
-        PERSIDENT: 0,   // 회장
+    POSITION: {
+        PRESIDENT: 0,   // 회장
         MANAGER: 1,     // 운영진
         MEMBER: 2       // 부원
     },

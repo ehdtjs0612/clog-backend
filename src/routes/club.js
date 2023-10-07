@@ -5,10 +5,9 @@ const validate = require('../module/validation');
 const loginAuth = require("../middleware/auth/loginAuth");
 const managerAuth = require("../middleware/auth/managerAuth");
 const presidentAuth = require("../middleware/auth/presidentAuth");
-const { BadRequestException } = require('../module/customError');
-const { club } = require("../module/global");
-const { position: POSITION } = require("../module/global");
 const CONSTRAINT = require("../module/constraint");
+const { BadRequestException } = require('../module/customError');
+const { CLUB, POSITION } = require("../module/global");
 
 // 동아리 생성 api
 router.post("/", loginAuth, async (req, res, next) => {
@@ -23,11 +22,11 @@ router.post("/", loginAuth, async (req, res, next) => {
     let pgClient = null;
 
     try {
-        validate(belong, "belong").checkInput().isNumber().checkLength(1, club.MAX_CLUB_BELONG_LENGTH);
-        validate(bigCategory, "bigCategory").checkInput().isNumber().checkLength(1, club.MAX_CLUB_BIG_CATEGORY_LENGTH);
-        validate(smallCategory, "smallCategory").checkInput().isNumber().checkLength(1, club.MAX_CLUB_SMALL_CATEGORY_LENGTH);
+        validate(belong, "belong").checkInput().isNumber().checkLength(1, CLUB.MAX_CLUB_BELONG_LENGTH);
+        validate(bigCategory, "bigCategory").checkInput().isNumber().checkLength(1, CLUB.MAX_CLUB_BIG_CATEGORY_LENGTH);
+        validate(smallCategory, "smallCategory").checkInput().isNumber().checkLength(1, CLUB.MAX_CLUB_SMALL_CATEGORY_LENGTH);
         validate(name, "name").checkInput().checkClubNameRegex();
-        validate(cover, "cover").checkInput().checkLength(1, club.MAX_CLUB_COVER_LENGTH);
+        validate(cover, "cover").checkInput().checkLength(1, CLUB.MAX_CLUB_COVER_LENGTH);
         validate(isRecruit, "isRecruit").checkInput().isBoolean();
         validate(themeColor, "themeColor").checkInput().checkThemeColorRegex();
 
@@ -148,11 +147,11 @@ router.put("/", loginAuth, managerAuth, async (req, res, next) => {
 
     try {
         validate(name, "name").checkInput().checkClubNameRegex();
-        validate(cover, "cover").checkInput().checkLength(1, club.MAX_CLUB_COVER_LENGTH);
+        validate(cover, "cover").checkInput().checkLength(1, CLUB.MAX_CLUB_COVER_LENGTH);
         validate(isAllowJoin, "isAllowJoin").checkInput();
         validate(themeColor, "themeColor").checkInput().checkThemeColorRegex();
-        validate(bannerImg, "bannerImg").checkInput().checkLength(1, club.MAX_BANNER_IMAGE_LENGTH);
-        validate(profileImg, "profileImg").checkInput().checkLength(1, club.MAX_PROFILE_IMAGE_LENGTH);
+        validate(bannerImg, "bannerImg").checkInput().checkLength(1, CLUB.MAX_BANNER_IMAGE_LENGTH);
+        validate(profileImg, "profileImg").checkInput().checkLength(1, CLUB.MAX_PROFILE_IMAGE_LENGTH);
 
         const modifyClubProfileSql = `UPDATE 
                                             club_tb
