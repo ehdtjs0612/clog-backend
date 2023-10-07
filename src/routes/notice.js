@@ -29,10 +29,10 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
                                             notice_post_tb.id,
                                             notice_post_tb.title, 
                                             notice_post_tb.content, 
-                                            notice_post_tb.is_fixed AS isFixed, 
-                                            TO_CHAR(notice_post_tb.created_at, 'YYYY-MM-DD') AS createdAt, 
-                                            account_tb.name AS authorName,
-                                            account_tb.personal_color AS authorPcolor
+                                            notice_post_tb.is_fixed AS "isFixed", 
+                                            TO_CHAR(notice_post_tb.created_at, 'YYYY-MM-DD') AS "createdAt", 
+                                            account_tb.name AS "authorName",
+                                            account_tb.personal_color AS "authorPcolor"
                                      FROM 
                                             notice_post_tb
                                      JOIN 
@@ -74,9 +74,9 @@ router.get("/fixed/club/:clubId", loginAuth, async (req, res, next) => {
         const selectedFixedNoticeSql = `SELECT
                                                 notice_post_tb.id,
                                                 notice_post_tb.title,
-                                                notice_post_tb.created_at AS createdAt,
-                                                account_tb.personal_color AS authorPcolor,
-                                                account_tb.name AS authorName
+                                                notice_post_tb.created_at AS "createdAt",
+                                                account_tb.personal_color AS "authorPcolor",
+                                                account_tb.name AS "authorName"
                                         FROM 
                                                 notice_post_tb
                                         JOIN

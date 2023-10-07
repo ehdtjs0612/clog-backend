@@ -12,6 +12,7 @@ const clubApi = require("./routes/club");
 const notificationApi = require("./routes/notification");
 const noticeApi = require("./routes/notice");
 const boardApi = require("./routes/board");
+const postApi = require("./routes/post");
 
 const errorHandling = require("./middleware/errorHandling");
 
@@ -30,6 +31,7 @@ app.use("/club", clubApi);
 app.use("/notification", notificationApi);
 app.use("/notice", noticeApi);
 app.use("/board", boardApi);
+app.use("/post", postApi);
 
 // error handling muddleware
 app.use(errorHandling());

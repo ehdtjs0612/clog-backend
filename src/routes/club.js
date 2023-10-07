@@ -48,7 +48,7 @@ router.post("/", loginAuth, async (req, res, next) => {
                                         club_member_tb (account_id, club_id, position) 
                                  VALUES 
                                         ($1, $2, $3)`;
-        const insertMemberParam = [userId, createdClubId, POSITION.PERSIDENT];
+        const insertMemberParam = [userId, createdClubId, POSITION.PRESIDENT];
         await pool.query(insertMemberSql, insertMemberParam);
 
         // 트랜잭션 커밋
@@ -96,13 +96,13 @@ router.get("/:clubId/profile", loginAuth, async (req, res, next) => {
         validate(clubId, "clubId").checkInput().isNumber();
 
         const selectedClubSql = `SELECT 
-                                        club_tb.name AS name, 
-                                        belong_tb.name AS belong, 
-                                        big_category_tb.name AS bigCategory, 
-                                        small_category_tb.name AS smallCategory, 
-                                        club_tb.profile_img AS profileImage, 
-                                        club_tb.cover AS cover, 
-                                        club_tb.created_at AS createdAt
+                                        club_tb.name AS "name", 
+                                        belong_tb.name AS "belong", 
+                                        big_category_tb.name AS "bigCategory", 
+                                        small_category_tb.name AS "smallCategory", 
+                                        club_tb.profile_img AS "profileImage", 
+                                        club_tb.cover AS "cover", 
+                                        club_tb.created_at AS "createdAt"
                                  FROM 
                                         club_tb
                                  JOIN 
@@ -280,13 +280,13 @@ router.get("/join-request/:clubId/list", loginAuth, managerAuth, async (req, res
         validate(clubId, "club-id").checkInput().isNumber();
 
         const selectJoinRequestSql = `SELECT 
-                                            join_request_tb.id AS requestId,
-                                            join_request_tb.account_id AS id, 
+                                            join_request_tb.id AS "requestId",
+                                            join_request_tb.account_id AS "id", 
                                             account_tb.name, 
-                                            account_tb.personal_color AS personalColor, 
-                                            account_tb.entry_year AS entryYear, 
-                                            major_tb.name AS major, 
-                                            join_request_tb.created_at AS createdAt 
+                                            account_tb.personal_color AS "personalColor", 
+                                            account_tb.entry_year AS "entryYear", 
+                                            major_tb.name AS "major", 
+                                            join_request_tb.created_at AS "createdAt" 
                                       FROM 
                                             join_request_tb 
                                       JOIN 
@@ -327,8 +327,8 @@ router.post("/member", loginAuth, managerAuth, async (req, res, next) => {
         // 트랜잭션 시작
         await pgClient.query("BEGIN");
         const selectJoinRequestMemberSql = `SELECT 
-                                                    account_id AS userId, 
-                                                    club_id AS clubId 
+                                                    account_id AS "userId", 
+                                                    club_id AS "clubId" 
                                             FROM 
                                                     join_request_tb 
                                             WHERE 
@@ -340,14 +340,13 @@ router.post("/member", loginAuth, managerAuth, async (req, res, next) => {
             throw new BadRequestException("가입 신청 목록에 해당 유저가 존재하지 않습니다");
         }
         // 가입 요청 테이블에서 해당 요청 인덱스에 대한 userId와 clubId를 추출
-        const { userid, clubid } = selectJoinRequestData.rows[0];
-
+        const { userId, clubId } = selectJoinRequestData.rows[0];
         // 추출한 userId와 clubId를 통해 club_member_tb로 유저를 삽입
         const insertMemberSql = `INSERT INTO 
                                             club_member_tb (account_id, club_id, position)
                                    VALUES
                                             ($1, $2, $3)`;
-        const insertMemberParams = [userid, clubid, POSITION.MEMBER];
+        const insertMemberParams = [userId, clubId, POSITION.MEMBER];
         await pgClient.query(insertMemberSql, insertMemberParams);
 
         // 위 두 작업이 완료되면 가입 요청 테이블에 해당 요청 인덱스를 제거
@@ -418,10 +417,10 @@ router.get("/member/:clubId/profile", loginAuth, async (req, res, next) => {
 
         const selectProfileSql = `SELECT
                                         account_tb.name, 
-                                        account_tb.personal_color AS personalColor, 
-                                        position_tb.name AS position, 
-                                        account_tb.entry_year AS entryYear, 
-                                        major_tb.name AS major 
+                                        account_tb.personal_color AS "personalColor", 
+                                        position_tb.name AS "position", 
+                                        account_tb.entry_year AS "entryYear", 
+                                        major_tb.name AS "major" 
                                   FROM 
                                         club_member_tb 
                                   JOIN 
@@ -458,11 +457,11 @@ router.get("/member/:clubId/list", loginAuth, async (req, res, next) => {
 
         const selectMemberListSql = `SELECT 
                                             club_member_tb.account_id, 
-                                            major_tb.name AS major, 
-                                            account_tb.entry_year AS entryYear, 
+                                            major_tb.name AS "major", 
+                                            account_tb.entry_year AS "entryYear", 
                                             account_tb.name, 
-                                            account_tb.personal_color AS personalColor, 
-                                            to_char(club_member_tb.created_at, 'yyyy.mm.dd') AS createdAt 
+                                            account_tb.personal_color AS "personalColor", 
+                                            to_char(club_member_tb.created_at, 'yyyy.mm.dd') AS "createdAt" 
                                      FROM 
                                             club_member_tb 
                                      JOIN 
@@ -575,7 +574,7 @@ router.get("/:clubId/banner", loginAuth, async (req, res, next) => {
         validate(clubId, "club-id").checkInput().isNumber();
 
         const selectClubBannerSql = `SELECT 
-                                            banner_img AS banner 
+                                            banner_img AS "banner"
                                      FROM 
                                             club_tb 
                                      WHERE 

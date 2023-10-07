@@ -16,6 +16,7 @@ module.exports = {
         MAX_CLUB_SMALL_CATEGORY_LENGTH: 5,
         MAX_BANNER_IMAGE_LENGTH: 20000,
         MAX_PROFILE_IMAGE_LENGTH: 20000,
+        MAX_ALL_POST_COUNT_PER_PAGE: 20,
         MAX_POST_COUNT_PER_PAGE: 10,
         MAX_FIXED_NOTICE_COUNT_PER_PAGE: 5,
         MAX_BOARD_COUNT: 10
@@ -32,18 +33,18 @@ module.exports = {
     },
 
     notificationUrl: {
-        clubComment : "/comment",
-        clubReply : "/reply",
-        notiComment : "/notice/comment",
-        notiReply : "/notice/reply",
-        prComment : "/promotion/comment",
-        prReply : "/promotion/reply",
-        gradeUpdate : "/club/position",
-        joinAccept : "/club/member"
+        clubComment: "/comment",
+        clubReply: "/reply",
+        notiComment: "/notice/comment",
+        notiReply: "/notice/reply",
+        prComment: "/promotion/comment",
+        prReply: "/promotion/reply",
+        gradeUpdate: "/club/position",
+        joinAccept: "/club/member"
     },
 
-    notification : {
-        idLength : 24,
-        limit : 5
+    notification: {
+        idLength: 24,
+        limit: 5
     }
 }
