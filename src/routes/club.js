@@ -96,13 +96,13 @@ router.get("/:clubId/profile", loginAuth, async (req, res, next) => {
         validate(clubId, "clubId").checkInput().isNumber();
 
         const selectedClubSql = `SELECT 
-                                        club_tb.name AS name, 
-                                        belong_tb.name AS belong, 
-                                        big_category_tb.name AS bigCategory, 
-                                        small_category_tb.name AS smallCategory, 
-                                        club_tb.profile_img AS profileImage, 
-                                        club_tb.cover AS cover, 
-                                        club_tb.created_at AS createdAt
+                                        club_tb.name AS "name", 
+                                        belong_tb.name AS "belong", 
+                                        big_category_tb.name AS "bigCategory", 
+                                        small_category_tb.name AS "smallCategory", 
+                                        club_tb.profile_img AS "profileImage", 
+                                        club_tb.cover AS "cover", 
+                                        club_tb.created_at AS "createdAt"
                                  FROM 
                                         club_tb
                                  JOIN 
@@ -280,13 +280,13 @@ router.get("/join-request/:clubId/list", loginAuth, managerAuth, async (req, res
         validate(clubId, "club-id").checkInput().isNumber();
 
         const selectJoinRequestSql = `SELECT 
-                                            join_request_tb.id AS requestId,
-                                            join_request_tb.account_id AS id, 
+                                            join_request_tb.id AS "requestId",
+                                            join_request_tb.account_id AS "id", 
                                             account_tb.name, 
-                                            account_tb.personal_color AS personalColor, 
-                                            account_tb.entry_year AS entryYear, 
-                                            major_tb.name AS major, 
-                                            join_request_tb.created_at AS createdAt 
+                                            account_tb.personal_color AS "personalColor", 
+                                            account_tb.entry_year AS "entryYear", 
+                                            major_tb.name AS "major", 
+                                            join_request_tb.created_at AS "createdAt" 
                                       FROM 
                                             join_request_tb 
                                       JOIN 
@@ -327,8 +327,8 @@ router.post("/member", loginAuth, managerAuth, async (req, res, next) => {
         // 트랜잭션 시작
         await pgClient.query("BEGIN");
         const selectJoinRequestMemberSql = `SELECT 
-                                                    account_id AS userId, 
-                                                    club_id AS clubId 
+                                                    account_id AS "userId", 
+                                                    club_id AS "clubId" 
                                             FROM 
                                                     join_request_tb 
                                             WHERE 
@@ -418,10 +418,10 @@ router.get("/member/:clubId/profile", loginAuth, async (req, res, next) => {
 
         const selectProfileSql = `SELECT
                                         account_tb.name, 
-                                        account_tb.personal_color AS personalColor, 
-                                        position_tb.name AS position, 
-                                        account_tb.entry_year AS entryYear, 
-                                        major_tb.name AS major 
+                                        account_tb.personal_color AS "personalColor", 
+                                        position_tb.name AS "position", 
+                                        account_tb.entry_year AS "entryYear", 
+                                        major_tb.name AS "major" 
                                   FROM 
                                         club_member_tb 
                                   JOIN 
@@ -458,11 +458,11 @@ router.get("/member/:clubId/list", loginAuth, async (req, res, next) => {
 
         const selectMemberListSql = `SELECT 
                                             club_member_tb.account_id, 
-                                            major_tb.name AS major, 
-                                            account_tb.entry_year AS entryYear, 
+                                            major_tb.name AS "major", 
+                                            account_tb.entry_year AS "entryYear", 
                                             account_tb.name, 
-                                            account_tb.personal_color AS personalColor, 
-                                            to_char(club_member_tb.created_at, 'yyyy.mm.dd') AS createdAt 
+                                            account_tb.personal_color AS "personalColor", 
+                                            to_char(club_member_tb.created_at, 'yyyy.mm.dd') AS "createdAt" 
                                      FROM 
                                             club_member_tb 
                                      JOIN 
@@ -575,7 +575,7 @@ router.get("/:clubId/banner", loginAuth, async (req, res, next) => {
         validate(clubId, "club-id").checkInput().isNumber();
 
         const selectClubBannerSql = `SELECT 
-                                            banner_img AS banner 
+                                            banner_img AS "banner"
                                      FROM 
                                             club_tb 
                                      WHERE 
