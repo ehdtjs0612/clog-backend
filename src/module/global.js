@@ -26,7 +26,7 @@ module.exports = {
     },
 
     POSITION: {
-        PERSIDENT: 0,   // 회장
+        PRESIDENT: 0,   // 회장
         MANAGER: 1,     // 운영진
         MEMBER: 2       // 부원
     },

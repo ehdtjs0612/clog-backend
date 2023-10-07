@@ -1,6 +1,6 @@
 const pool = require("../../../config/database/postgresql");
 const validate = require("../../module/validation");
-const { POSITION: POSITION } = require("../../module/global");
+const { POSITION } = require("../../module/global");
 const { ForbbidenException } = require('../../module/customError');
 
 module.exports = async (req, res, next) => {
@@ -20,7 +20,7 @@ module.exports = async (req, res, next) => {
         const selectPositionParam = [userId, clubId];
         const selectPositionData = await pool.query(selectPositionSql, selectPositionParam);
         if (selectPositionData.rowCount !== 0) {
-            if (selectPositionData.rows[0].position !== POSITION.PERSIDENT) {
+            if (selectPositionData.rows[0].position === POSITION.PRESIDENT) {
                 return next();
             };
         }
