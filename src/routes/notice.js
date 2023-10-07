@@ -1,8 +1,8 @@
 const router = require("express").Router();
 const pool = require("../../config/database/postgresql");
-const loginAuth = require("../middleware/loginAuth");
+const loginAuth = require("../middleware/auth/loginAuth");
 const validate = require("../module/validation");
-const { club } = require("../module/global");
+const { CLUB } = require("../module/global");
 const { BadRequestException } = require("../module/customError");
 
 // 동아리 공지 게시물 불러오는 api
@@ -16,10 +16,10 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
     if (page < 1) page = 1;
 
     try {
-        validate(clubId, "clubId").checkInput().isNumber().checkLength(1, 5);
+        validate(clubId, "clubId").checkInput().isNumber();
         validate(page, "page").isNumber().checkLength(1, 5);
 
-        const offset = (page - 1) * club.maxPostCountPerPage;
+        const offset = (page - 1) * CLUB.MAX_POST_COUNT_PER_PAGE;
         const selectNoticeAllCountSql = `SELECT
                                                 count(*)::int
                                           FROM
@@ -45,7 +45,7 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
                                             $2
                                      LIMIT 
                                             $3`;
-        const selectNoticePostParam = [clubId, offset, club.maxPostCountPerPage];
+        const selectNoticePostParam = [clubId, offset, CLUB.MAX_POST_COUNT_PER_PAGE];
         const noticeAllCountData = await pool.query(selectNoticeAllCountSql);
         const noticePostData = await pool.query(selectNoticePostSql, selectNoticePostParam);
         if (noticePostData.rowCount !== 0) {
@@ -87,7 +87,7 @@ router.get("/fixed/club/:clubId", loginAuth, async (req, res, next) => {
                                                 club_id = $1
                                         LIMIT
                                                 $2`;
-        const selectedFixedNoticeParam = [clubId, club.maxFixedNoticeCountPerPage];
+        const selectedFixedNoticeParam = [clubId, CLUB.MAX_FIXED_NOTICE_COUNT_PER_PAGE];
 
         const data = await pool.query(selectedFixedNoticeSql, selectedFixedNoticeParam);
         if (data.rowCount !== 0) {

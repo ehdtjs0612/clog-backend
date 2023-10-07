@@ -1,10 +1,11 @@
-const pool = require("../../config/database/postgresql");
 const router = require("express").Router();
+const pool = require("../../config/database/postgresql");
+const loginAuth = require("../middleware/auth/loginAuth");
 const validate = require("../module/validation");
 const bcryptUtil = require("../module/bcrypt");
-const { BadRequestException } = require("../module/customError");
 const personalColor = require("../module/personalColor");
-const loginAuth = require("../middleware/loginAuth");
+const CONSTRAINT = require("../module/constraint");
+const { BadRequestException } = require("../module/customError");
 
 // 회원가입
 router.post("/", async (req, res, next) => {
@@ -38,8 +39,11 @@ router.post("/", async (req, res, next) => {
         res.send(result);
 
     } catch (error) {
-        if (error.code === '23505') {
+        if (error.constraint === CONSTRAINT.UNIQUE_ACCOUNT_EMAIL) {
             return next(new BadRequestException("중복된 이메일이 존재합니다"));
+        }
+        if (error.constraint === CONSTRAINT.FK_MAJOR) {
+            return next(new BadRequestException("해당하는 전공이 없습니다"));
         }
         next(error);
     }
@@ -62,9 +66,8 @@ router.get("/", loginAuth, async (req, res, next) => {
             result.message = "프로필 조회 성공";
             result.data = data.rows[0]
         }
-
         res.send(result);
-        
+
     } catch (error) {
         next(error);
     }

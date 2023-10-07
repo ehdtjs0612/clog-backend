@@ -1,12 +1,12 @@
 module.exports = {
-    uniqueAccountEmail: "unique_account_tb_email",
+    UNIQUE_ACCOUNT_EMAIL: "unique_account_tb_email",
+    UNIQUE_CLUB_NAME: "unique_club_tb_name",
 
-    uniqueClubName: "unique_club_tb_name",
-    uniqueClubMember: "unique_club_member_tb_account_id",
-
-    fkAccount: "fk_account_tb_to_club_member_tb",
-    fkMajor: "fk_major_tb_to_account_tb",
-    fkBelong: "fk_belong_tb_to_club_tb",
-    fkBigCategory: "fk_big_category_tb_to_club_tb",
-    fkSmallCategory: "fk_small_category_tb_to_club_tb",
+    FK_ACCOUNT: "fk_account_tb_to_club_member_tb",
+    FK_CLUB: "fk_club_tb_to_join_request_tb",
+    FK_MAJOR: "fk_major_tb_to_account_tb",
+    FK_BELONG: "fk_belong_tb_to_club_tb",
+    FK_BIG_CATEGORY: "fk_big_category_tb_to_club_tb",
+    FK_SMALL_CATEGORY: "fk_small_category_tb_to_club_tb",
+    FK_POSITION: "fk_position_tb_to_club_member_tb"
 }
