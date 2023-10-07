@@ -71,4 +71,30 @@ router.post("/", loginAuth, managerAuth, async (req, res, next) => {
     }
 });
 
+// 게시판 수정 api
+router.put("/", loginAuth, managerAuth, async (req, res, next) => {
+    const { boardId, name } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(name, "name").checkInput().checkLength(1, board.MAX_BOARD_LENGTH);
+        validate(boardId, "boardId").checkInput().isNumber();
+
+        const updateBoardSql = `UPDATE club_board_tb SET name = $1 WHERE id = $2`;
+        const updateBoardParams = [name, boardId];
+        const updateBoardData = await pool.query(updateBoardSql, updateBoardParams);
+        if (updateBoardData.rowCount !== 0) {
+            result.message = "게시판 수정 성공";
+            return res.send(result);
+        }
+        throw new BadRequestException("해당하는 게시판이 존재하지 않습니다");
+
+    } catch (error) {
+        next(error);
+    }
+});
+
 module.exports = router;
