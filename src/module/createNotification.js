@@ -8,9 +8,9 @@ const { notificationUrl } = require("../module/global")
 const createNotification = async (url, key) => {
     let type
     let sql
-
-    switch (url) {
-        case notificationUrl.clubComment:
+    
+    switch (url) { // api url에 따라 알림 type과 sql 설정
+        case notificationUrl.clubComment :
             type = "club_comment"
             sql = `SELECT account_tb.name AS "author", 
                 club_tb.name  AS "club_name",
@@ -125,18 +125,19 @@ const createNotification = async (url, key) => {
     }
 
     const selectedData = await pool.query(sql, [key])
-
+       
     if (selectedData.rowCount == 0) throw new BadRequestException("존재하지 않는 알림입니다")
 
-    for (let index = 0; index < selectedData.rowCount; index++) {
+    for (let index = 0; index < selectedData.rowCount; index++) { // 몽고디비에 저장하기 위한 필드 추가
         selectedData.rows[index].type = type
         selectedData.rows[index].is_read = false
     }
+    console.log(selectedData.rows)
+    conn = await client.connect(process.env.MONGODB_URL) 
 
-    conn = await client.connect(process.env.MONGODB_URL)
+    if (selectedData.rowCount != 0) await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).insertMany(selectedData.rows, { ignoreUndefined: true })
 
-    if (selectedData.rowCount != 0) await conn.db("clog_mongodb").collection("notification").insertMany(selectedData.rows, { ignoreUndefined: true })
-
+    // 답글 알림의 경우 댓글 알림으로 바꿔서 한번 더 실행
     if (type == "club_reply") {
         await createNotification(notificationUrl.clubComment, selectedData.rows[0].comment_id)
     }
@@ -148,6 +149,10 @@ const createNotification = async (url, key) => {
     if (type == "pr_reply") {
         await createNotification(notificationUrl.prComment, selectedData.rows[0].comment_id)
     }
+
+    await conn.close()
 }
+
+createNotification(notificationUrl.clubComment,2)
 
 module.exports = createNotification 

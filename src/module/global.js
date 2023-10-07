@@ -32,13 +32,18 @@ module.exports = {
     },
 
     notificationUrl: {
-        clubComment: "/comment",
-        clubReply: "/reply",
-        notiComment: "/notice/comment",
-        notiReply: "/notice/reply",
-        prComment: "/promotion/comment",
-        prReply: "/promotion/reply",
-        gradeUpdate: "/club/position",
-        joinAccept: "/club/member"
+        clubComment : "/comment",
+        clubReply : "/reply",
+        notiComment : "/notice/comment",
+        notiReply : "/notice/reply",
+        prComment : "/promotion/comment",
+        prReply : "/promotion/reply",
+        gradeUpdate : "/club/position",
+        joinAccept : "/club/member"
+    },
+
+    notification : {
+        idLength : 24,
+        limit : 5
     }
 }

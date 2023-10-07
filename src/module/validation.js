@@ -1,4 +1,4 @@
-const { pwRegex, nameRegex, emailRegex, clubNameRegex, themeColorRegex } = require("../module/regex");
+const { pwRegex, nameRegex, emailRegex, clubNameRegex, themeColorRegex, notificationIdRegex } = require("../module/regex");
 const { BadRequestException } = require("../module/customError");
 const errorMessage = {
     invalidInput: "요청값이 잘못되었습니다",
@@ -42,6 +42,11 @@ function Validation(input, name) {
 
     this.checkEmailRegex = () => {
         if (!emailRegex.test(input)) this.setError(errorMessage.regex);
+        return this;
+    }
+
+    this.checkNotificationIdRegex = () => {
+        if (!notificationIdRegex.test(input)) this.setError(errorMessage.regex);
         return this;
     }
 
