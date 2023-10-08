@@ -71,7 +71,7 @@ router.post("/", loginAuth, async (req, res, next) => {
             next(new BadRequestException("해당하는 소속이 존재하지 않습니다"));
         }
         if (error.constraint === CONSTRAINT.FK_BIG_CATEGORY) {
-            next(new BadRequestException("해당하는 대분류가 존재하지 않습니다"))
+            next(new BadRequestException("해당하는 대분류가 존재하지 않습니다"));
         }
         if (error.constraint === CONSTRAINT.FK_SMALL_CATEGORY) {
             next(new BadRequestException("해당하는 소분류가 존재하지 않습니다"));
@@ -502,7 +502,7 @@ router.put("/position", loginAuth, presidentAuth, async (req, res, next) => {
         pgClient = await pool.connect();
 
         // 1. 회장이 권한을 다른사람에게 넘길 경우, 먼저 기존 회장의(본인의) 직급을 동아리 부원으로 변환시켜주고
-        if (position === '0') {
+        if (position === POSITION.PRESIDENT) {
             // 트랜잭션 시작
             await pgClient.query("BEGIN");
             const changePositionSql = `UPDATE
@@ -511,7 +511,7 @@ router.put("/position", loginAuth, presidentAuth, async (req, res, next) => {
                                                 position = $1
                                        WHERE
                                                 account_id = $2 AND club_id = $3`;
-            const changePositionParam = [POSITION.MEMBER, req.decoded.id, clubId];
+            const changePositionParam = [POSITION.MANAGER, req.decoded.id, clubId];
             await pgClient.query(changePositionSql, changePositionParam);
             // 2. 그 다음, 유저에게 회장 권한을 부여
             const updatePositionSql = `UPDATE 
