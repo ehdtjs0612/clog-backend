@@ -109,7 +109,7 @@ router.get("/list/board/:boardId", loginAuth, async (req, res, next) => {
 });
 
 // 게시물 조회 api
-router.get("/:postId", async (req, res, next) => {
+router.get("/:postId", loginAuth, async (req, res, next) => {
     const { postId } = req.params;
     const result = {
         message: "",
