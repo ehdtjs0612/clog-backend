@@ -1,10 +1,10 @@
-const loginAuth = require('../middleware/auth/loginAuth');
-const { CLUB } = require('../module/global');
-const validate = require('../module/validation');
-const pool = require("../../config/database/postgresql");
-const { BadRequestException } = require('../module/customError');
-
 const router = require("express").Router();
+const pool = require("../../config/database/postgresql");
+const loginAuth = require('../middleware/auth/loginAuth');
+const validate = require('../module/validation');
+const CONSTRAINT = require("../module/constraint");
+const { CLUB, POST } = require('../module/global');
+const { BadRequestException } = require('../module/customError');
 
 // 동아리 내 전체 게시글을 가져오는 api
 router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
@@ -160,6 +160,63 @@ router.get("/:postId", loginAuth, async (req, res, next) => {
 
     } catch (error) {
         next(error);
+    }
+});
+
+// 게시물 작성 api
+router.post("/", loginAuth, async (req, res, next) => {
+    const { boardId, title, content, images } = req.body;
+    const userId = req.decoded.id;
+    const result = {
+        message: "",
+        data: {}
+    }
+    let pgClient = null;
+
+    try {
+        validate(boardId, "boardId").checkInput().isNumber();
+        validate(title, "title").checkInput().checkLength(1, POST.MAX_POST_TITLE_LENGTH);
+        validate(content, "content").checkInput().checkLength(1, POST.MAX_POST_CONTENT_LENGTH);
+
+        pgClient = await pool.connect();
+        pgClient.query("BEGIN");
+        // 1. 게시글 테이블에 삽입
+        const insertPostSql = `INSERT INTO 
+                                        club_post_tb (club_board_id, account_id, title, content) 
+                               VALUES 
+                                        ($1, $2, $3, $4) 
+                               RETURNING 
+                                        id`;
+        const insertPostParam = [boardId, userId, title, content];
+        const insertPostData = await pgClient.query(insertPostSql, insertPostParam);
+
+        // 2. 게시글 이미지 테이블에 이미지 삽입
+        const insertPostImageSql = `INSERT INTO 
+                                            post_img_tb (post_id, post_img) 
+                                    SELECT 
+                                            $1, UNNEST($2::TEXT[])`;
+        const insertPostImageParam = [insertPostData.rows[0].id, images];
+        await pgClient.query(insertPostImageSql, insertPostImageParam);
+
+        pgClient.query("COMMIT");
+        result.data = {
+            "postId": insertPostData.rows[0].id
+        };
+        res.send(result);
+
+    } catch (error) {
+        if (pgClient) {
+            await pgClient.query("ROLLBACK");
+        }
+        if (error.constraint === CONSTRAINT.FK_BOARD) {
+            return next(new BadRequestException("해당하는 게시판이 존재하지 않습니다"));
+        }
+        next(error);
+
+    } finally {
+        if (pgClient) {
+            pgClient.release();
+        }
     }
 });
 
