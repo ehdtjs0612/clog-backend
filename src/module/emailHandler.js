@@ -2,7 +2,7 @@ require("dotenv").config();
 
 const nodeMailer = require("nodemailer");
 const redisClient = require("../../config/database/redis");
-const { auth } = require("../module/global");
+const { AUTH: auth } = require("../module/global");
 
 const sendVerifyEmail = async (email) => {
     const transporter = nodeMailer.createTransport({

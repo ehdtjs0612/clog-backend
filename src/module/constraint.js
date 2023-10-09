@@ -8,5 +8,10 @@ module.exports = {
     FK_BELONG: "fk_belong_tb_to_club_tb",
     FK_BIG_CATEGORY: "fk_big_category_tb_to_club_tb",
     FK_SMALL_CATEGORY: "fk_small_category_tb_to_club_tb",
-    FK_POSITION: "fk_position_tb_to_club_member_tb"
+    FK_POSITION: "fk_position_tb_to_club_member_tb",
+
+    // NOTICE
+    NOTICE_POST_IMG_TB : {
+        FK_POST_ID: "fk_notice_post_tb_to_notice_post_img_tb",
+    }
 }
