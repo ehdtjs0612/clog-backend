@@ -1,10 +1,9 @@
 const router = require("express").Router();
-
 const pool = require('../../config/database/postgresql');
 const loginAuth = require('../middleware/auth/loginAuth');
-const managerAuth = require('../middleware/auth/managerAuth');
+const authCheck = require("../middleware/auth/authCheck");
 const validate = require('../module/validation');
-const { CLUB, BOARD } = require("../module/global");
+const { CLUB, BOARD, POSITION } = require("../module/global");
 const { BadRequestException } = require('../module/customError');
 
 // 게시판 리스트 조회 api
@@ -34,7 +33,7 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
 });
 
 // 게시판 생성 api
-router.post("/", loginAuth, managerAuth, async (req, res, next) => {
+router.post("/", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) => {
     const { clubId, name } = req.body;
     const result = {
         message: "",
@@ -71,7 +70,7 @@ router.post("/", loginAuth, managerAuth, async (req, res, next) => {
 });
 
 // 게시판 수정 api
-router.put("/", loginAuth, managerAuth, async (req, res, next) => {
+router.put("/", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) => {
     const { boardId, name } = req.body;
     const result = {
         message: "",
@@ -96,7 +95,8 @@ router.put("/", loginAuth, managerAuth, async (req, res, next) => {
     }
 });
 
-router.delete("/", managerAuth, async (req, res, next) => {
+// 게시판 삭제 api
+router.delete("/", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) => {
     const { boardId } = req.body;
     const result = {
         message: "",
