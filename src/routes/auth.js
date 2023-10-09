@@ -17,8 +17,8 @@ router.post("/login", async (req, res, next) => {
     };
 
     try {
-        validate(email, "email").checkInput().checkLength(1, account.maxEmailLength);
-        validate(pw, "pw").checkInput().checkLength(1, account.maxPwLength);
+        validate(email, "email").checkInput().checkLength(1, account.MAX_EMAIL_LENGTH);
+        validate(pw, "pw").checkInput().checkLength(1, account.MAX_PW_LENGTH);
 
         const sql = "SELECT id, pw FROM account_TB WHERE email = $1";
         const params = [email];
@@ -116,7 +116,7 @@ router.post("/signup/verify-email", async (req, res, next) => {
 
     try {
         validate(email, "email").checkInput().checkEmailRegex();
-        validate(code, "code").checkInput().isNumber().checkLength(auth.certifiedLength, auth.certifiedLength);
+        validate(code, "code").checkInput().isNumber().checkLength(auth.CERTIFIED_LENGTH, auth.CERTIFIED_LENGTH);
 
         const data = await redisClient.get(email);
         // redis에 이메일이 존재하지 않는 경우

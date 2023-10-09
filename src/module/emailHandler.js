@@ -16,7 +16,7 @@ const sendVerifyEmail = async (email) => {
     });
     const authCode = Math.floor(Math.random() * 89999) + 10000;
     redisClient.set(email, authCode.toString());
-    redisClient.expire(email, auth.certifiedExpireTime);
+    redisClient.expire(email, auth.CERTIFIED_EXPIRE_TIME);
 
     const option = {
         from: process.env.NODEMAILER_ID,
