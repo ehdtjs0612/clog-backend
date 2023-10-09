@@ -3,11 +3,10 @@ const router = require("express").Router();
 const pool = require("../../config/database/postgresql");
 const validate = require('../module/validation');
 const loginAuth = require("../middleware/auth/loginAuth");
-const managerAuth = require("../middleware/auth/managerAuth");
-const presidentAuth = require("../middleware/auth/presidentAuth");
 const CONSTRAINT = require("../module/constraint");
 const { BadRequestException } = require('../module/customError');
 const { CLUB, POSITION } = require("../module/global");
+const authCheck = require("../middleware/auth/authCheck");
 
 // 동아리 생성 api
 router.post("/", loginAuth, async (req, res, next) => {
@@ -86,7 +85,7 @@ router.post("/", loginAuth, async (req, res, next) => {
 });
 
 // 동아리 프로필 조회 api
-router.get("/:clubId/profile", loginAuth, async (req, res, next) => {
+router.get("/:clubId/profile", loginAuth, authCheck(POSITION.MEMBER), async (req, res, next) => {
     const { clubId } = req.params;
     const result = {
         message: "",
@@ -131,11 +130,11 @@ router.get("/:clubId/profile", loginAuth, async (req, res, next) => {
 
 // 동아리 관리자 페이지 (동아리 프로필)api
 // 논의 필요
-router.get("/:clubId/manage", loginAuth, managerAuth, async (req, res, next) => {
+router.get("/:clubId/manage", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) => {
 });
 
 // 동아리 수정 api
-router.put("/", loginAuth, managerAuth, async (req, res, next) => {
+router.put("/", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) => {
     const {
         name, cover, isAllowJoin, themeColor, bannerImg, profileImg
     } = req.body;
@@ -269,7 +268,7 @@ router.post("/join-request", loginAuth, async (req, res, next) => {
 });
 
 // 동아리 가입 신청 리스트 조회 api
-router.get("/join-request/:clubId/list", loginAuth, managerAuth, async (req, res, next) => {
+router.get("/join-request/:clubId/list", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) => {
     const { clubId } = req.params;
     const result = {
         message: "",
@@ -312,7 +311,7 @@ router.get("/join-request/:clubId/list", loginAuth, managerAuth, async (req, res
 });
 
 // 동아리 가입 신청 승인 api
-router.post("/member", loginAuth, managerAuth, async (req, res, next) => {
+router.post("/member", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) => {
     const { requestId } = req.body;
     const result = {
         message: "",
@@ -380,7 +379,7 @@ router.post("/member", loginAuth, managerAuth, async (req, res, next) => {
 });
 
 // 동아리 가입 신청 거부 api
-router.delete("/join-request", loginAuth, managerAuth, async (req, res, next) => {
+router.delete("/join-request", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) => {
     const { requestId } = req.body;
     const result = {
         message: "",
@@ -486,7 +485,7 @@ router.get("/member/:clubId/list", loginAuth, async (req, res, next) => {
 });
 
 // 직급 변경시켜주는 api
-router.put("/position", loginAuth, presidentAuth, async (req, res, next) => {
+router.put("/position", loginAuth, authCheck(POSITION.PRESIDENT), async (req, res, next) => {
     const { userId, clubId, position } = req.body;
     const result = {
         message: "",
