@@ -9,8 +9,11 @@ module.exports = (req, res, next) => {
 
     try {
         req.decoded = jwt.verify(accessToken, process.env.JWT_SECRET_KEY);
-        return next();
 
+        if (typeof req.decoded === 'string')
+            return next(new UnauthorizedException("로그인 후 이용 가능합니다"));
+
+        return next();
     } catch (error) {
         return next(new UnauthorizedException("로그인 후 이용 가능합니다"));
     }
