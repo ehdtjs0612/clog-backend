@@ -13,35 +13,58 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
         message: "",
         data: {}
     };
-    let page = req.query.page ?? 1;
-    if (page < 1) page = 1;
+    const page = Number(req.query.page || 1);
 
     try {
         validate(clubId, "clubId").checkInput().isNumber();
+        validate(page, "page").isNumber().isPositive();
+
+        const selectClubSql = `SELECT id FROM club_tb WHERE club_tb.id = $1`;
+        const selectClubParam = [clubId];
+        const selectClubData = await pool.query(selectClubSql, selectClubParam);
+
+        if (!selectClubData.rowCount) {
+            return next(new BadRequestException("존재하지 않는 동아리입니다."));
+        }
 
         const offset = (page - 1) * CLUB.MAX_POST_COUNT_PER_PAGE;
         const selectAllPostCountSql = `SELECT 
-                                                count(*)::int
-                                       FROM
-                                                club_post_tb`;
+                                            count(*)::int
+                                        FROM
+                                            club_post_tb
+                                        JOIN
+                                            club_board_tb
+                                        ON
+                                            club_board_tb.id = club_post_tb.club_board_id
+                                        JOIN
+                                            club_tb
+                                        ON
+                                            club_tb.id = club_board_tb.club_id
+                                        WHERE
+                                            club_tb.id = $1`;
+        const selectAllPostCountParam = [clubId];
         const selectAllPostSql = `SELECT
                                             club_post_tb.id AS "postId",
                                             account_tb.name AS "authorName",
                                             club_post_tb.title AS "title",
-                                            COUNT(club_comment_tb.id) AS "commentCount",
+                                            (
+                                                SELECT
+                                                    COUNT(*)
+                                                FROM
+                                                    club_comment_tb
+                                                WHERE
+                                                    club_comment_tb.club_post_id = club_post_tb.id
+                                            )::int AS "commentCount",
+                                            -- COUNT(club_comment_tb.id) AS "commentCount",
                                             club_post_tb.created_at AS createdAt
                                   FROM
                                             club_post_tb
                                   JOIN
                                             account_tb ON club_post_tb.account_id = account_tb.id
-                                  LEFT JOIN
-                                            club_comment_tb ON club_post_tb.id = club_comment_tb.club_post_id 
                                   JOIN 
                                             club_board_tb ON club_post_tb.club_board_id = club_board_tb.id 
                                   WHERE 
                                             club_board_tb.club_id = $1
-                                  GROUP BY
-                                            club_post_tb.id, account_tb.name, club_post_tb.title, club_post_tb.created_at
                                   ORDER BY
                                             club_post_tb.created_at DESC
                                   OFFSET
@@ -49,15 +72,13 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
                                   LIMIT
                                             $3`;
         const selectAllPostParam = [clubId, offset, CLUB.MAX_ALL_POST_COUNT_PER_PAGE];
-        const selectAllPostCountData = await pool.query(selectAllPostCountSql);
+        const selectAllPostCountData = await pool.query(selectAllPostCountSql, selectAllPostCountParam);
         const selectAllPostData = await pool.query(selectAllPostSql, selectAllPostParam);
-        if (selectAllPostData.rowCount !== 0) {
-            result.data = {
-                count: selectAllPostCountData.rows[0].count,
-                posts: selectAllPostData.rows
-            }
+        result.data = {
+            count: selectAllPostCountData.rows[0].count,
+            posts: selectAllPostData.rows
         }
-        result.message = "해당 동아리에 게시글이 존재하지 않습니다";
+        //result.message = "해당 동아리에 게시글이 존재하지 않습니다";
         return res.send(result);
 
     } catch (error) {
@@ -111,6 +132,7 @@ router.get("/list/board/:boardId", loginAuth, async (req, res, next) => {
 // 게시물 조회 api
 router.get("/:postId", loginAuth, async (req, res, next) => {
     const { postId } = req.params;
+    const userId = req.decoded.id;
     const result = {
         message: "",
         data: {}
@@ -127,8 +149,9 @@ router.get("/:postId", loginAuth, async (req, res, next) => {
                                         account_tb.entry_year AS "authorEntryYear", 
                                         club_post_tb.title AS "postTitle", 
                                         club_post_Tb.content AS "postContent", 
-                                        ARRAY_AGG(post_img_tb.post_img) AS "postImages", 
-                                        TO_CHAR(club_post_tb.created_at, 'yyyy.mm.dd') AS "createdAt" 
+                                        ARRAY_AGG(post_img_tb.post_img) AS "postImages",
+                                        TO_CHAR(club_post_tb.created_at, 'yyyy.mm.dd') AS "createdAt",
+                                        club_post_tb.account_id = $2 AS "authorState"
                                FROM 
                                         club_post_tb 
                                JOIN 
@@ -148,7 +171,7 @@ router.get("/:postId", loginAuth, async (req, res, next) => {
                                         club_post_tb.title, 
                                         club_post_tb.content, 
                                         club_post_tb.created_at`;
-        const selectPostParam = [postId];
+        const selectPostParam = [postId, userId];
         const selectPostData = await pool.query(selectPostSql, selectPostParam);
         if (selectPostData.rowCount !== 0) {
             result.data = {
@@ -179,7 +202,7 @@ router.post("/", loginAuth, async (req, res, next) => {
         validate(content, "content").checkInput().checkLength(1, POST.MAX_POST_CONTENT_LENGTH);
 
         pgClient = await pool.connect();
-        pgClient.query("BEGIN");
+        await pgClient.query("BEGIN");
         // 1. 게시글 테이블에 삽입
         const insertPostSql = `INSERT INTO 
                                         club_post_tb (club_board_id, account_id, title, content) 
@@ -194,16 +217,15 @@ router.post("/", loginAuth, async (req, res, next) => {
         const insertPostImageSql = `INSERT INTO 
                                             post_img_tb (post_id, post_img) 
                                     SELECT 
-                                            $1, UNNEST($2::TEXT[])`;
+                                            $1, UNNEST($2::VARCHAR[])`;
         const insertPostImageParam = [insertPostData.rows[0].id, images];
         await pgClient.query(insertPostImageSql, insertPostImageParam);
 
-        pgClient.query("COMMIT");
+        await pgClient.query("COMMIT");
+
         result.data = {
             "postId": insertPostData.rows[0].id
         };
-        res.send(result);
-
     } catch (error) {
         if (pgClient) {
             await pgClient.query("ROLLBACK");
@@ -218,6 +240,105 @@ router.post("/", loginAuth, async (req, res, next) => {
             pgClient.release();
         }
     }
+
+    res.send(result);
+});
+
+// 게시글 수정 api
+router.put("/", loginAuth, async (req, res, next) => {
+    const { postId, title, content, images } = req.body;
+    const userId = req.decoded.id;
+    const result = {
+        message: "",
+        data: {}
+    }
+    let pgClient = null;
+
+    try {
+        validate(postId, "postId").checkInput().isNumber();
+        validate(title, "title").checkInput().checkLength(1, POST.MAX_POST_TITLE_LENGTH);
+        validate(content, "content").checkInput().checkLength(1, POST.MAX_POST_CONTENT_LENGTH);
+
+        pgClient = await pool.connect();
+        await pgClient.query("BEGIN");
+        // 본인이 쓴 글이거나 position 0 or 1
+        const selectPositionSql = `SELECT
+                                        club_post_tb.account_id AS "accountId",
+                                        (
+                                            SELECT
+                                                club_member_tb.position
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.club_id = club_tb.id
+                                            AND
+                                                club_member_tb.account_id = $2
+                                        ) AS position
+                                    FROM    
+                                        club_post_tb
+                                    JOIN
+                                        club_board_tb
+                                    ON
+                                        club_board_tb.id = club_post_tb.club_board_id
+                                    JOIN
+                                        club_tb
+                                    ON
+                                        club_board_tb.club_id = club_tb.id
+                                    WHERE
+                                        club_post_tb.id = $1`;
+        const selectPositionResult = await pgClient.query(selectPositionSql, [postId, userId]);
+
+        if (selectPositionResult.rowCount === 0) {
+            return next(new BadRequestException("게시글이 존재하지 않습니다."));
+        }
+
+        if (selectPositionResult.rows[0].position >= 2 && selectPositionResult.rows[0].accountId !== userId) {
+            return next(new BadRequestException("권한이 존재하지 않습니다."));
+        }
+
+        // 1. 게시글 본문 (title, content)수정
+        const updatePostSql = `UPDATE 
+                                        club_post_tb 
+                               SET 
+                                        title = $1,
+                                        content = $2 
+                               WHERE 
+                                        id = $3`;
+        const updatePostParam = [title, content, postId];
+        await pgClient.query(updatePostSql, updatePostParam);
+
+        // 2. 기존의 게시글 이미지 삭제
+        const deletePostImageSql = `DELETE FROM 
+                                                post_img_tb
+                                    WHERE
+                                                 post_id = $1`;
+        const deletePostImageParam = [postId];
+        await pgClient.query(deletePostImageSql, deletePostImageParam);
+        // 3. 다시 게시글 이미지 테이블에 이미지 업로드
+        const insertPostImageSql = `INSERT INTO 
+                                                post_img_tb (post_id, post_img) 
+                                    SELECT 
+                                                $1, UNNEST($2::VARCHAR[])`;
+        const insertPostImageParam = [postId, images];
+        await pgClient.query(insertPostImageSql, insertPostImageParam);
+
+        await pgClient.query("COMMIT");
+    } catch (error) {
+        if (pgClient) {
+            await pgClient.query("ROLLBACK");
+        }
+        if (error.constraint === CONSTRAINT.FK_CLUB_POST) {
+            next(new BadRequestException("해당하는 게시글이 존재하지 않습니다"));
+        }
+        next(error);
+
+    } finally {
+        if (pgClient) {
+            pgClient.release;
+        }
+    }
+
+    res.send(result);
 });
 
 module.exports = router;
