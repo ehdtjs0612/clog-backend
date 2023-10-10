@@ -12,12 +12,11 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
         data: {}
     };
     const { clubId } = req.params;
-    let page = req.query.page ?? 1;
-    if (page < 1) page = 1;
+    const page = Number(req.query.page || 1);
 
     try {
         validate(clubId, "clubId").checkInput().isNumber();
-        validate(page, "page").isNumber().checkLength(1, 5);
+        validate(page, 'page').isNumber().isPositive();
 
         const offset = (page - 1) * CLUB.MAX_POST_COUNT_PER_PAGE;
         const selectNoticeAllCountSql = `SELECT
@@ -48,18 +47,20 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
         const selectNoticePostParam = [clubId, offset, CLUB.MAX_POST_COUNT_PER_PAGE];
         const noticeAllCountData = await pool.query(selectNoticeAllCountSql);
         const noticePostData = await pool.query(selectNoticePostSql, selectNoticePostParam);
-        if (noticePostData.rowCount !== 0) {
-            result.data = {
-                count: noticeAllCountData.rows[0].count,
-                notice: noticePostData.rows
-            }
-            return res.send(result);
+        if (noticePostData.rowCount === 0) {
+            throw new BadRequestException("해당하는 동아리에 공지글이 존재하지 않습니다");
         }
-        throw new BadRequestException("해당하는 동아리에 공지글이 존재하지 않습니다");
+
+        result.data = {
+            count: noticeAllCountData.rows[0].count,
+            notice: noticePostData.rows
+        }
 
     } catch (error) {
         next(error);
     }
+
+    res.send(result);
 });
 
 // 고정 공지 게시물 불러오는 api
@@ -91,16 +92,18 @@ router.get("/fixed/club/:clubId", loginAuth, async (req, res, next) => {
 
         const data = await pool.query(selectedFixedNoticeSql, selectedFixedNoticeParam);
         if (data.rowCount !== 0) {
-            result.data = {
-                notice: data.rows
-            }
-            return res.send(result);
+            throw new BadRequestException("고정 공지 게시글이 존재하지 않습니다");
         }
-        throw new BadRequestException("고정 공지 게시글이 존재하지 않습니다");
+
+        result.data = {
+            notice: data.rows
+        }
 
     } catch (error) {
         next(error);
     }
+
+    res.send(result);
 });
 
 module.exports = router;
