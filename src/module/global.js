@@ -31,6 +31,12 @@ module.exports = {
         MAX_POST_CONTENT_LENGTH: 500
     },
 
+    IMAGE: {
+        MAX_POST_COUNT: 3, // 30개
+        MAX_PROMOTION_COUNT: 3, // 5개
+        MAX_NOTICE_COUNT: 3 // 30개
+    },
+
     POSITION: {
         PRESIDENT: 0,   // 회장
         MANAGER: 1,     // 운영진

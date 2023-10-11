@@ -221,10 +221,10 @@ router.post("/", loginAuth, async (req, res, next) => {
         await pgClient.query(insertPostImageSql, insertPostImageParam);
 
         await pgClient.query("COMMIT");
-
         result.data = {
             "postId": insertPostData.rows[0].id
         };
+
     } catch (error) {
         if (pgClient) {
             await pgClient.query("ROLLBACK");
@@ -327,7 +327,7 @@ router.put("/", loginAuth, async (req, res, next) => {
             await pgClient.query("ROLLBACK");
         }
         if (error.constraint === CONSTRAINT.FK_CLUB_POST) {
-            next(new BadRequestException("해당하는 게시글이 존재하지 않습니다"));
+            return next(new BadRequestException("해당하는 게시글이 존재하지 않습니다"));
         }
         return next(error);
 
