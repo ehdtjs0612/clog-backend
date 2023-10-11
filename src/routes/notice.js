@@ -137,13 +137,12 @@ router.post("/", loginAuth, managerAuth, async (req, res, next) => {
 
         res.send(result)
     } catch (error) {
-        next(error)
         if (error.constraint === NOTICE_POST_IMG_TB.FK_POST_ID) {
             return next(new BadRequestException("존재하지 않는 게시글 입니다"))
         }
+        next(error)
     }
 })
-
 
 // 공지 게시물 수정
 router.put("/", loginAuth, managerAuth, async (req, res, next) => {
@@ -171,8 +170,7 @@ router.put("/", loginAuth, managerAuth, async (req, res, next) => {
         const putNoticeImgSql = `UPDATE notice_post_img_tb AS img
             SET post_img = $1 
             FROM notice_post_tb AS post
-            WHERE img.post_id = post.id AND post.id = $2 AND post.account_id = $3
-            RETURNING post.id AS "post_id"`
+            WHERE img.post_id = post.id AND post.id = $2 AND post.account_id = $3`
         const putNoticeImgParams = [ images, noticeId, userId ]
         const putNoticeImgResult = await pool.query(putNoticeImgSql, putNoticeImgParams)
         if (putNoticeImgResult == 0) throw new BadRequestException("일치하는 공지 게시물 이미지가 없습니다")
@@ -183,5 +181,41 @@ router.put("/", loginAuth, managerAuth, async (req, res, next) => {
         next(error)
     }
 })
+
+// 공지 게시물 삭제
+
+router.delete("/", loginAuth, managerAuth, async (req, res, next) => {
+    const { noticeId, clubId } = req.body
+    const userId = req.decoded.id
+    const result = {
+        message: "",
+        data: {}
+    }
+
+    try {
+        validate(clubId, "clubId").checkInput().isNumber()
+        validate(noticeId, "noticeId").checkInput().isNumber()
+
+        const deleteNoticeSql = `DELETE FROM notice_post_tb 
+            WHERE account_id = $1 AND id = $2`
+        const deleteNoticeParams = [ userId, noticeId ]
+        const deleteNoticeResult = await pool.query(deleteNoticeSql, deleteNoticeParams)
+        if (deleteNoticeResult == 0) throw new BadRequestException("일치하는 공지 게시물이 없습니다")
+
+        // const putNoticeImgSql = `UPDATE notice_post_img_tb AS img
+        //     SET post_img = $1 
+        //     FROM notice_post_tb AS post
+        //     WHERE img.post_id = post.id AND post.id = $2 AND post.account_id = $3`
+        // const putNoticeImgParams = [ images, noticeId, userId ]
+        // const putNoticeImgResult = await pool.query(putNoticeImgSql, putNoticeImgParams)
+        // if (putNoticeImgResult == 0) throw new BadRequestException("일치하는 공지 게시물 이미지가 없습니다")
+
+        result.message = "공지 게시물 수정 성공"
+        res.send(result)
+    } catch (error) {
+        next(error)
+    }
+})
+
 
 module.exports = router;
