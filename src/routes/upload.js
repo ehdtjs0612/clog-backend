@@ -15,8 +15,15 @@ router.post("/club-profile", loginAuth, imageUploader.clubProfileUploader(), asy
 });
 
 // 동아리 배너 이미지 업로드
-router.post("/club-banner", async (req, res, next) => {
+router.post("/club-banner", loginAuth, imageUploader.clubBannerUploader(), async (req, res, next) => {
+    const image = req.file;
+    const result = {
+        message: "",
+        data: {},
+    }
 
+    result.data = image.location;
+    res.send(result);
 });
 
 // 동아리 게시글 이미지 업로드
