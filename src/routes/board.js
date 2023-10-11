@@ -29,7 +29,7 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
         }
     }
     catch (error) {
-        next(error);
+        return next(error);
     }
 
     res.send(result);
@@ -66,7 +66,7 @@ router.post("/", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) 
 
         result.data = createBoardData.rows[0].id;
     } catch (error) {
-        next(error);
+        return next(error);
     }
 
     res.send(result);
@@ -91,10 +91,10 @@ router.put("/", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) =
             throw new BadRequestException("해당하는 게시판이 존재하지 않습니다");
         }
     } catch (error) {
-        next(error);
+        return next(error);
     }
 
-    return res.send(result);
+    res.send(result);
 });
 
 // 게시판 삭제 api
@@ -119,7 +119,7 @@ router.delete("/", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next
         }
 
     } catch (error) {
-        next(error);
+        return next(error);
     }
 
     res.send(result);

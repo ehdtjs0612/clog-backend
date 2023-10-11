@@ -39,8 +39,11 @@ router.post("/login", async (req, res, next) => {
             httpOnly: false,
             secure: false,
         });
+        result.data = {
+            userId: userData.id
+        }
     } catch (error) {
-        next(error);
+        return next(error);
     }
 
     res.send(result);
@@ -56,7 +59,7 @@ router.post("/logout", (req, res, next) => {
     try {
         res.clearCookie("accessToken");
     } catch (error) {
-        next(error);
+        return next(error);
     }
 
     res.send(result);
@@ -82,7 +85,7 @@ router.get("/duplicate/email/:email", async (req, res, next) => {
             throw new BadRequestException("중복된 이메일이 존재합니다");
         }
     } catch (error) {
-        next(error);
+        return next(error);
     }
 
     res.send(result);
@@ -100,7 +103,7 @@ router.post("/send-code", async (req, res, next) => {
         // validate(email, "email").checkInput().checkEmailRegex();
         await emailHandler.sendVerifyEmail(email);
     } catch (error) {
-        next(error);
+        return next(error);
     }
 
     res.send(result);
@@ -131,7 +134,7 @@ router.post("/signup/verify-email", async (req, res, next) => {
         result.message = "인증이 완료되었습니다";
         await redisClient.del(email);
     } catch (error) {
-        next(error);
+        return next(error);
     }
 
     res.send(result);
@@ -171,7 +174,7 @@ router.post("/reset-pw/verify-email", async (req, res, next) => {
 
         await redisClient.del(email);
     } catch (error) {
-        next(error);
+        return next(error);
     }
 
     res.send(result);
