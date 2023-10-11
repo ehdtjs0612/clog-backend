@@ -3,7 +3,7 @@ const pool = require("../../config/database/postgresql");
 const loginAuth = require('../middleware/auth/loginAuth');
 const validate = require('../module/validation');
 const CONSTRAINT = require("../module/constraint");
-const { CLUB, POST } = require('../module/global');
+const { CLUB, POST, POSITION } = require('../module/global');
 const { BadRequestException } = require('../module/customError');
 
 // 동아리 내 전체 게시글을 가져오는 api
@@ -291,8 +291,8 @@ router.put("/", loginAuth, async (req, res, next) => {
             return next(new BadRequestException("게시글이 존재하지 않습니다."));
         }
 
-        if (selectPositionResult.rows[0].position >= 2 && selectPositionResult.rows[0].accountId !== userId) {
-            return next(new BadRequestException("권한이 존재하지 않습니다."));
+        if (selectPositionResult.rows[0].accountId !== userId && selectPositionResult.rows[0].position >= POSITION.MANAGER) {
+            return next(new BadRequestException("수정 권한이 존재하지 않습니다."));
         }
 
         // 1. 게시글 본문 (title, content)수정
