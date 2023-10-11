@@ -27,7 +27,7 @@ module.exports = (position) => {
                 throw new ForbbidenException("관리자 권한이 필요합니다");
             }
         } catch (error) {
-            next(error);
+            return next(error);
         }
 
         next();

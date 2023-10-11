@@ -3,7 +3,7 @@ const pool = require("../../config/database/postgresql");
 const loginAuth = require('../middleware/auth/loginAuth');
 const validate = require('../module/validation');
 const CONSTRAINT = require("../module/constraint");
-const { CLUB, POST } = require('../module/global');
+const { CLUB, POST, POSITION } = require('../module/global');
 const { BadRequestException } = require('../module/customError');
 
 // 동아리 내 전체 게시글을 가져오는 api
@@ -291,8 +291,8 @@ router.put("/", loginAuth, async (req, res, next) => {
             return next(new BadRequestException("게시글이 존재하지 않습니다."));
         }
 
-        if (selectPositionResult.rows[0].position >= 2 && selectPositionResult.rows[0].accountId !== userId) {
-            return next(new BadRequestException("권한이 존재하지 않습니다."));
+        if (selectPositionResult.rows[0].accountId !== userId && selectPositionResult.rows[0].position >= POSITION.MANAGER) {
+            return next(new BadRequestException("수정 권한이 존재하지 않습니다."));
         }
 
         // 1. 게시글 본문 (title, content)수정
@@ -337,6 +337,52 @@ router.put("/", loginAuth, async (req, res, next) => {
         }
     }
 
+    res.send(result);
+});
+
+// 게시글 삭제 api
+router.delete("/", loginAuth, async (req, res, next) => {
+    const { postId } = req.body;
+    const userId = req.decoded.id;
+
+    try {
+        // 본인이 쓴 글이거나 position 0 or 1
+        const selectAuthorSql = `SELECT 
+                                    account_id AS "accountId", 
+                                    (
+                                        SELECT 
+                                            club_member_tb.position 
+                                        FROM 
+                                            club_member_tb 
+                                        WHERE 
+                                            account_id = $1 
+                                        AND 
+                                            club_id = club_tb.id
+                                    ) AS "position"
+                                 FROM
+                                    club_post_tb
+                                 JOIN
+                                    club_board_tb
+                                 ON
+                                    club_board_tb.id = club_post_tb.club_board_id
+                                 JOIN
+                                    club_tb
+                                 ON
+                                    club_tb.id = club_board_tb.club_id
+                                 WHERE
+                                    club_post_tb.id = $2`;
+        const selectAuthorParam = [userId, postId];
+        const selectAuthorData = await pool.query(selectAuthorSql, selectAuthorParam);
+        if (selectAuthorData.rowCount === 0) {
+            throw new BadRequestException("해당하는 게시글이 존재하지 않습니다");
+        }
+        if (selectAuthorData.rows[0].accountId !== userId && selectAuthorData.rows[0].position >= POSITION.MANAGER) {
+            throw new BadRequestException("삭제 권한이 존재하지 않습니다");
+        }
+
+    } catch (error) {
+        return next(error);
+    }
     res.send(result);
 });
 
