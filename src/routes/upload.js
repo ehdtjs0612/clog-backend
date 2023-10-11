@@ -1,9 +1,17 @@
 const router = require("express").Router();
 const loginAuth = require("../middleware/auth/loginAuth");
+const imageUploader = require("../middleware/imageUploader");
 
 // 동아리 프로필 이미지 업로드
-router.post("/club-profile", loginAuth, async (req, res, next) => {
+router.post("/club-profile", loginAuth, imageUploader.clubProfileUploader(), async (req, res, next) => {
+    const image = req.file;
+    const result = {
+        message: "",
+        data: {},
+    }
 
+    result.data = image.location;
+    res.send(result);
 });
 
 // 동아리 배너 이미지 업로드
