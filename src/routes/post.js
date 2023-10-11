@@ -78,12 +78,11 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
             count: selectAllPostCountData.rows[0].count,
             posts: selectAllPostData.rows
         }
-        //result.message = "해당 동아리에 게시글이 존재하지 않습니다";
-        return res.send(result);
 
     } catch (error) {
-        next(error);
+        return next(error);
     }
+    res.send(result);
 });
 
 // 게시판의 게시물 리스트 조회 api
@@ -122,11 +121,11 @@ router.get("/list/board/:boardId", loginAuth, async (req, res, next) => {
                 posts: selectPostOfBoardData.rows
             }
         }
-        return res.send(result);
 
     } catch (error) {
-        next(error);
+        return next(error);
     }
+    res.send(result);
 });
 
 // 게시물 조회 api
@@ -233,7 +232,7 @@ router.post("/", loginAuth, async (req, res, next) => {
         if (error.constraint === CONSTRAINT.FK_BOARD) {
             return next(new BadRequestException("해당하는 게시판이 존재하지 않습니다"));
         }
-        next(error);
+        return next(error);
 
     } finally {
         if (pgClient) {
@@ -330,7 +329,7 @@ router.put("/", loginAuth, async (req, res, next) => {
         if (error.constraint === CONSTRAINT.FK_CLUB_POST) {
             next(new BadRequestException("해당하는 게시글이 존재하지 않습니다"));
         }
-        next(error);
+        return next(error);
 
     } finally {
         if (pgClient) {

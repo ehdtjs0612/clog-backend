@@ -20,7 +20,7 @@ module.exports = (position) => {
             const selectPositionData = await pool.query(selectPositionSql, selectPositionParam);
 
             if (selectPositionData.rowCount === 0) {
-                throw new ForbbidenException("로그인 사용자가 동아리에 가입된 사용자가 아닙니다");
+                throw new ForbbidenException("동아리에 가입되어있지 않습니다");
             }
 
             if (selectPositionData.rows[0].position > position) {

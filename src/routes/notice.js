@@ -57,7 +57,7 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
         }
 
     } catch (error) {
-        next(error);
+        return next(error);
     }
 
     res.send(result);
@@ -100,7 +100,7 @@ router.get("/fixed/club/:clubId", loginAuth, async (req, res, next) => {
         }
 
     } catch (error) {
-        next(error);
+        return next(error);
     }
 
     res.send(result);
