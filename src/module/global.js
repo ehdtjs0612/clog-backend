@@ -17,7 +17,6 @@ module.exports = {
         MAX_BANNER_IMAGE_LENGTH: 20000,
         MAX_PROFILE_IMAGE_LENGTH: 20000,
         MAX_ALL_POST_COUNT_PER_PAGE: 20,
-        MAX_POST_COUNT_PER_PAGE: 10,
         MAX_FIXED_NOTICE_COUNT_PER_PAGE: 5,
         MAX_BOARD_COUNT: 10
     },
@@ -28,7 +27,19 @@ module.exports = {
 
     POST: {
         MAX_POST_TITLE_LENGTH: 32,
-        MAX_POST_CONTENT_LENGTH: 500
+        MAX_POST_CONTENT_LENGTH: 500,
+        MAX_POST_COUNT_PER_PAGE: 10
+    },
+
+    COMMENT: {
+        MAX_COMMENT_COUNT_PER_POST: 10, // 논의 (임시)
+        MAX_COMMENT_CONTENT_LENGTH: 300 // 논의 (임시)
+    },
+
+    IMAGE: {
+        MAX_POST_COUNT: 3, // 30개
+        MAX_PROMOTION_COUNT: 3, // 5개
+        MAX_NOTICE_COUNT: 3 // 30개
     },
 
     POSITION: {

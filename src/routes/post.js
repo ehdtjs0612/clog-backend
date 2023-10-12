@@ -27,7 +27,7 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
             return next(new BadRequestException("존재하지 않는 동아리입니다."));
         }
 
-        const offset = (page - 1) * CLUB.MAX_POST_COUNT_PER_PAGE;
+        const offset = (page - 1) * POST.MAX_POST_COUNT_PER_PAGE;
         const selectAllPostCountSql = `SELECT 
                                             count(*)::int
                                         FROM
@@ -186,6 +186,7 @@ router.get("/:postId", loginAuth, async (req, res, next) => {
 });
 
 // 게시물 작성 api
+// 권한: 동아리 가입된 사람만 쓸수있음
 router.post("/", loginAuth, async (req, res, next) => {
     const { boardId, title, content, images } = req.body;
     const userId = req.decoded.id;
@@ -202,7 +203,30 @@ router.post("/", loginAuth, async (req, res, next) => {
 
         pgClient = await pool.connect();
         await pgClient.query("BEGIN");
-        // 1. 게시글 테이블에 삽입
+        // 1. 게시글 작성 권한이 있는지 확인
+        const selectClubAuthSql = `SELECT 
+                                        (
+                                            SELECT 
+                                                club_member_tb.id 
+                                            FROM 
+                                                club_member_tb 
+                                            WHERE 
+                                                club_member_tb.club_id = club_tb.id AND club_member_tb.account_id = $1
+                                        ) AS "accountId" 
+                                    FROM 
+                                        club_board_tb 
+                                    JOIN 
+                                        club_tb 
+                                    ON 
+                                        club_board_tb.club_id = club_tb.id 
+                                    WHERE 
+                                        club_board_tb.id = $2`;
+        const selectClubAuthParam = [userId, boardId];
+        const selectClubAuthData = await pgClient.query(selectClubAuthSql, selectClubAuthParam);
+        if (!selectClubAuthData.rows[0].accountId) {
+            throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
+        }
+        // 2. 게시글 테이블에 삽입
         const insertPostSql = `INSERT INTO 
                                         club_post_tb (club_board_id, account_id, title, content) 
                                VALUES 
@@ -212,7 +236,7 @@ router.post("/", loginAuth, async (req, res, next) => {
         const insertPostParam = [boardId, userId, title, content];
         const insertPostData = await pgClient.query(insertPostSql, insertPostParam);
 
-        // 2. 게시글 이미지 테이블에 이미지 삽입
+        // 3. 게시글 이미지 테이블에 이미지 삽입
         const insertPostImageSql = `INSERT INTO 
                                             post_img_tb (post_id, post_img) 
                                     SELECT 
@@ -221,10 +245,10 @@ router.post("/", loginAuth, async (req, res, next) => {
         await pgClient.query(insertPostImageSql, insertPostImageParam);
 
         await pgClient.query("COMMIT");
-
         result.data = {
             "postId": insertPostData.rows[0].id
         };
+
     } catch (error) {
         if (pgClient) {
             await pgClient.query("ROLLBACK");
@@ -326,8 +350,8 @@ router.put("/", loginAuth, async (req, res, next) => {
         if (pgClient) {
             await pgClient.query("ROLLBACK");
         }
-        if (error.constraint === CONSTRAINT.FK_CLUB_POST) {
-            next(new BadRequestException("해당하는 게시글이 존재하지 않습니다"));
+        if (error.constraint === CONSTRAINT.FK_CLUB_POST_TO_IMG_TB) {
+            return next(new BadRequestException("해당하는 게시글이 존재하지 않습니다"));
         }
         return next(error);
 

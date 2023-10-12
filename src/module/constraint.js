@@ -16,5 +16,6 @@ module.exports = {
     },
 
     FK_BOARD: "fk_club_board_tb_to_club_post_tb",
-    FK_CLUB_POST: "fk_club_post_tb_to_post_img_tb"
+    FK_CLUB_POST_TO_IMG_TB: "fk_club_post_tb_to_post_img_tb",
+    FK_CLUB_POST_TO_COMMENT_TB: "fk_club_post_tb_to_club_comment_tb"
 }
