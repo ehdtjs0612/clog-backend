@@ -27,7 +27,7 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
             return next(new BadRequestException("존재하지 않는 동아리입니다."));
         }
 
-        const offset = (page - 1) * CLUB.MAX_POST_COUNT_PER_PAGE;
+        const offset = (page - 1) * POST.MAX_POST_COUNT_PER_PAGE;
         const selectAllPostCountSql = `SELECT 
                                             count(*)::int
                                         FROM
@@ -326,7 +326,7 @@ router.put("/", loginAuth, async (req, res, next) => {
         if (pgClient) {
             await pgClient.query("ROLLBACK");
         }
-        if (error.constraint === CONSTRAINT.FK_CLUB_POST) {
+        if (error.constraint === CONSTRAINT.FK_CLUB_POST_TO_IMG_TB) {
             return next(new BadRequestException("해당하는 게시글이 존재하지 않습니다"));
         }
         return next(error);
