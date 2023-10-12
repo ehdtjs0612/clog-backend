@@ -23,25 +23,30 @@ router.post("/login", async (req, res, next) => {
         const sql = "SELECT id, pw FROM account_TB WHERE email = $1";
         const params = [email];
         const data = await pool.query(sql, params);
-        if (data.rowCount !== 0) {
-            const userData = data.rows[0];
-            // 입력받은 pw와 암호화된 pw가 일치할경우 accessToken 발급
-            const passwordMatch = bcryptUtil.compare(pw, userData.pw);
-            if (passwordMatch) {
-                const accessToken = await jwtUtil.userSign(userData);
-                res.cookie("accessToken", accessToken, {
-                    httpOnly: false,
-                    secure: false,
-                });
-                result.message = "로그인 성공";
-                return res.send(result);
-            }
+        if (data.rowCount === 0) {
+            throw new BadRequestException("아이디 또는 비밀번호가 올바르지 않습니다");
         }
-        throw new BadRequestException("아이디 또는 비밀번호가 올바르지 않습니다");
 
+        const userData = data.rows[0];
+        // 입력받은 pw와 암호화된 pw가 일치할경우 accessToken 발급
+        const passwordMatch = bcryptUtil.compare(pw, userData.pw);
+        if (!passwordMatch) {
+            throw new BadRequestException("아이디 또는 비밀번호가 올바르지 않습니다.");
+        }
+
+        const accessToken = await jwtUtil.userSign(userData);
+        res.cookie("accessToken", accessToken, {
+            httpOnly: false,
+            secure: false,
+        });
+        result.data = {
+            userId: userData.id
+        }
     } catch (error) {
-        next(error);
+        return next(error);
     }
+
+    res.send(result);
 });
 
 // 로그아웃 api
@@ -53,11 +58,11 @@ router.post("/logout", (req, res, next) => {
 
     try {
         res.clearCookie("accessToken");
-        return res.send(result);
-
     } catch (error) {
-        next(error);
+        return next(error);
     }
+
+    res.send(result);
 });
 
 // 이메일 중복 체크 api
@@ -79,12 +84,11 @@ router.get("/duplicate/email/:email", async (req, res, next) => {
         if (data.rowCount !== 0) {
             throw new BadRequestException("중복된 이메일이 존재합니다");
         }
-        result.message = "사용 가능한 이메일입니다";
-        res.send(result);
-
     } catch (error) {
-        next(error);
+        return next(error);
     }
+
+    res.send(result);
 });
 
 // 이메일 인증번호 전송 api
@@ -97,13 +101,12 @@ router.post("/send-code", async (req, res, next) => {
 
     try {
         // validate(email, "email").checkInput().checkEmailRegex();
-        emailHandler.sendVerifyEmail(email);
-
-        result.message = "인증번호 전송 완료";
-        res.send(result);
+        await emailHandler.sendVerifyEmail(email);
     } catch (error) {
-        next(error);
+        return next(error);
     }
+
+    res.send(result);
 });
 
 // 회원가입을 위한 이메일 인증 api
@@ -130,11 +133,11 @@ router.post("/signup/verify-email", async (req, res, next) => {
         // 인증번호가 유효한 경우
         result.message = "인증이 완료되었습니다";
         await redisClient.del(email);
-        return res.send(result);
-
     } catch (error) {
-        next(error);
+        return next(error);
     }
+
+    res.send(result);
 });
 
 // 비밀번호 재설정을 위한 이메일 인증 api
@@ -167,15 +170,14 @@ router.post("/reset-pw/verify-email", async (req, res, next) => {
             throw new BadRequestException("해당하는 사용자가 존재하지 않습니다");
         }
         const userPk = userData.rows[0].id;
-        result.message = "인증이 완료되었습니다";
         result.data.userId = userPk;
 
         await redisClient.del(email);
-        return res.send(result);
-
     } catch (error) {
-        next(error);
+        return next(error);
     }
+
+    res.send(result);
 });
 
 module.exports = router;

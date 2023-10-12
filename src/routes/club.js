@@ -3,11 +3,10 @@ const router = require("express").Router();
 const pool = require("../../config/database/postgresql");
 const validate = require('../module/validation');
 const loginAuth = require("../middleware/auth/loginAuth");
-const managerAuth = require("../middleware/auth/managerAuth");
-const presidentAuth = require("../middleware/auth/presidentAuth");
 const CONSTRAINT = require("../module/constraint");
 const { BadRequestException } = require('../module/customError');
 const { CLUB, POSITION } = require("../module/global");
+const authCheck = require("../middleware/auth/authCheck");
 
 // 동아리 생성 api
 router.post("/", loginAuth, async (req, res, next) => {
@@ -76,7 +75,7 @@ router.post("/", loginAuth, async (req, res, next) => {
         if (error.constraint === CONSTRAINT.FK_SMALL_CATEGORY) {
             next(new BadRequestException("해당하는 소분류가 존재하지 않습니다"));
         }
-        next(error);
+        return next(error);
 
     } finally {
         if (pgClient) {
@@ -86,7 +85,7 @@ router.post("/", loginAuth, async (req, res, next) => {
 });
 
 // 동아리 프로필 조회 api
-router.get("/:clubId/profile", loginAuth, async (req, res, next) => {
+router.get("/:clubId/profile", loginAuth, authCheck(POSITION.MEMBER), async (req, res, next) => {
     const { clubId } = req.params;
     const result = {
         message: "",
@@ -125,17 +124,17 @@ router.get("/:clubId/profile", loginAuth, async (req, res, next) => {
         return res.send(result);
 
     } catch (error) {
-        next(error);
+        return next(error);
     }
 });
 
 // 동아리 관리자 페이지 (동아리 프로필)api
 // 논의 필요
-router.get("/:clubId/manage", loginAuth, managerAuth, async (req, res, next) => {
+router.get("/:clubId/manage", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) => {
 });
 
 // 동아리 수정 api
-router.put("/", loginAuth, managerAuth, async (req, res, next) => {
+router.put("/", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) => {
     const {
         name, cover, isAllowJoin, themeColor, bannerImg, profileImg
     } = req.body;
@@ -170,12 +169,11 @@ router.put("/", loginAuth, managerAuth, async (req, res, next) => {
         ];
         const modifyClubProfileData = await pool.query(modifyClubProfileSql, modifyClubProfileParam);
         if (modifyClubProfileData.rowCount !== 0) {
-            result.message = "수정 성공";
             return res.send(result);
         }
 
     } catch (error) {
-        next(error);
+        return next(error);
     }
 });
 
@@ -200,15 +198,15 @@ router.get("/duplicate/club-name/:clubName", loginAuth, async (req, res, next) =
                                         REPLACE(name, ' ', '') = $1`;
         const selectClubNameParam = [removeSpaceClubName];
         const selectClubNameData = await pool.query(selectClubNameSql, selectClubNameParam);
-        if (selectClubNameData.rowCount === 0) {
-            result.message = "사용 가능한 이름입니다";
-            return res.send(result);
+        if (selectClubNameData.rowCount !== 0) {
+            throw new BadRequestException("해당하는 동아리 이름이 존재합니다");
         }
-        throw new BadRequestException("해당하는 동아리 이름이 존재합니다");
+        result.message = "사용 가능한 이름입니다";
 
     } catch (error) {
-        next(error);
+        return next(error);
     }
+    res.send(result);
 });
 
 // 동아리 가입 신청 api
@@ -264,12 +262,12 @@ router.post("/join-request", loginAuth, async (req, res, next) => {
         if (error.constraint === CONSTRAINT.FK_CLUB) {
             return next(new BadRequestException("해당하는 동아리가 존재하지 않습니다"));
         }
-        next(error);
+        return next(error);
     }
 });
 
 // 동아리 가입 신청 리스트 조회 api
-router.get("/join-request/:clubId/list", loginAuth, managerAuth, async (req, res, next) => {
+router.get("/join-request/:clubId/list", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) => {
     const { clubId } = req.params;
     const result = {
         message: "",
@@ -307,12 +305,12 @@ router.get("/join-request/:clubId/list", loginAuth, managerAuth, async (req, res
         res.send(result);
 
     } catch (error) {
-        next(error);
+        return next(error);
     }
 });
 
 // 동아리 가입 신청 승인 api
-router.post("/member", loginAuth, managerAuth, async (req, res, next) => {
+router.post("/member", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) => {
     const { requestId } = req.body;
     const result = {
         message: "",
@@ -348,7 +346,6 @@ router.post("/member", loginAuth, managerAuth, async (req, res, next) => {
                                             ($1, $2, $3)`;
         const insertMemberParams = [userId, clubId, POSITION.MEMBER];
         await pgClient.query(insertMemberSql, insertMemberParams);
-
         // 위 두 작업이 완료되면 가입 요청 테이블에 해당 요청 인덱스를 제거
         const deleteJoinRequestMemberSql = `DELETE FROM 
                                                 join_request_tb 
@@ -359,28 +356,24 @@ router.post("/member", loginAuth, managerAuth, async (req, res, next) => {
 
         // 트랜잭션 커밋
         await pgClient.query("COMMIT");
-        res.send(result);
-
     } catch (error) {
         if (pgClient) {
             await pgClient.query("ROLLBACK");
         }
-        if (error.constraint === CONSTRAINT.uniqueClubMember) {
-            return next(new BadRequestException("해당하는 부원이 이미 존재합니다"));
-        }
         if (error.constraint === CONSTRAINT.FK_ACCOUNT) {
             return next(new BadRequestException("해당하는 사용자가 존재하지 않습니다"));
         }
-        next(error);
+        return next(error);
     } finally {
         if (pgClient) {
             pgClient.release();
         }
     }
+    res.send(result);
 });
 
 // 동아리 가입 신청 거부 api
-router.delete("/join-request", loginAuth, managerAuth, async (req, res, next) => {
+router.delete("/join-request", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) => {
     const { requestId } = req.body;
     const result = {
         message: "",
@@ -396,11 +389,12 @@ router.delete("/join-request", loginAuth, managerAuth, async (req, res, next) =>
         if (deleteJoinRequestData.rowCount === 0) {
             throw new BadRequestException("해당하는 가입 신청 내역이 존재하지 않습니다");
         }
-        res.send(result);
 
     } catch (error) {
-        next(error);
+        return next(error);
     }
+
+    res.send(result);
 });
 
 // 동아리 내부 개인 프로필 api
@@ -437,11 +431,12 @@ router.get("/member/:clubId/profile", loginAuth, async (req, res, next) => {
             throw new BadRequestException("해당 동아리에 가입되어있지 않습니다");
         }
         result.data = selectProfileData.rows[0];
-        res.send(result);
 
     } catch (error) {
-        next(error);
+        return next(error);
     }
+
+    res.send(result);
 });
 
 // 동아리 내 멤버 리스트 api
@@ -456,7 +451,8 @@ router.get("/member/:clubId/list", loginAuth, async (req, res, next) => {
         validate(clubId, "club-id").checkInput().isNumber();
 
         const selectMemberListSql = `SELECT 
-                                            club_member_tb.account_id, 
+                                            club_member_tb.account_id AS "userId",
+                                            position_tb.name AS "position", 
                                             major_tb.name AS "major", 
                                             account_tb.entry_year AS "entryYear", 
                                             account_tb.name, 
@@ -467,7 +463,9 @@ router.get("/member/:clubId/list", loginAuth, async (req, res, next) => {
                                      JOIN 
                                             account_tb ON club_member_tb.account_id = account_tb.id 
                                      JOIN 
-                                            major_tb ON account_tb.major = major_tb.id 
+                                            major_tb ON account_tb.major = major_tb.id
+                                     JOIN
+                                            position_tb ON club_member_tb.position = position_tb.id
                                      WHERE 
                                             club_id = $1;`;
         const selectMemberListParam = [clubId];
@@ -478,15 +476,16 @@ router.get("/member/:clubId/list", loginAuth, async (req, res, next) => {
         result.data = {
             users: selectMemberListData.rows
         };
-        res.send(result);
 
     } catch (error) {
-        next(error);
+        return next(error);
     }
+
+    res.send(result);
 });
 
 // 직급 변경시켜주는 api
-router.put("/position", loginAuth, presidentAuth, async (req, res, next) => {
+router.put("/position", loginAuth, authCheck(POSITION.PRESIDENT), async (req, res, next) => {
     const { userId, clubId, position } = req.body;
     const result = {
         message: "",
@@ -501,10 +500,10 @@ router.put("/position", loginAuth, presidentAuth, async (req, res, next) => {
 
         pgClient = await pool.connect();
 
-        // 1. 회장이 권한을 다른사람에게 넘길 경우, 먼저 기존 회장의(본인의) 직급을 동아리 부원으로 변환시켜주고
+        // 1. 회장이 권한을 다른사람에게 넘길 경우, 먼저 기존 회장의(본인의) 직급을 동아리 운영진으로 변환시켜주고
+        await pgClient.query("BEGIN");
         if (position === POSITION.PRESIDENT) {
             // 트랜잭션 시작
-            await pgClient.query("BEGIN");
             const changePositionSql = `UPDATE
                                                 club_member_tb
                                        SET
@@ -522,30 +521,25 @@ router.put("/position", loginAuth, presidentAuth, async (req, res, next) => {
                                                 account_id = $2 AND club_id = $3`;
             const updatePositionParam = [position, userId, clubId];
             const updatePositionData = await pgClient.query(updatePositionSql, updatePositionParam);
-            if (updatePositionData.rowCount !== 0) {
-                await pgClient.query("COMMIT");
-                result.message = "변경이 완료되었습니다";
-
-                return res.send(result);
+            if (updatePositionData.rowCount === 0) {
+                throw new BadRequestException("해당하는 유저가 존재하지 않습니다");
             }
-            throw new BadRequestException("해당하는 유저가 존재하지 않습니다");
-        }
-
-        // 그 외엔 다른 유저의 직급을 변경
-        const updatePositionSql = `UPDATE 
+        } else if (position !== POSITION.PRESIDENT) {
+            // 그 외엔 다른 유저의 직급을 변경
+            const updatePositionSql = `UPDATE 
                                             club_member_tb
-                                   SET 
+                                        SET 
                                             position = $1 
-                                   WHERE 
+                                        WHERE 
                                             account_id = $2 AND club_id = $3`;
-        const updatePositionParam = [position, userId, clubId];
-        const updatePositionData = await pgClient.query(updatePositionSql, updatePositionParam);
-        if (updatePositionData.rowCount !== 0) {
-            result.message = "변경이 완료되었습니다";
-            return res.send(result);
+            const updatePositionParam = [position, userId, clubId];
+            const updatePositionData = await pgClient.query(updatePositionSql, updatePositionParam);
+            if (updatePositionData.rowCount === 0) {
+                throw new BadRequestException("해당하는 유저가 존재하지 않습니다");
+            }
         }
-        throw new BadRequestException("해당하는 유저가 존재하지 않습니다");
 
+        await pgClient.query("COMMIT");
     } catch (error) {
         if (pgClient) {
             await pgClient.query("ROLLBACK");
@@ -553,13 +547,15 @@ router.put("/position", loginAuth, presidentAuth, async (req, res, next) => {
         if (error.constraint === CONSTRAINT.FK_POSITION) {
             return next(new BadRequestException("해당하는 직급이 존재하지 않습니다"));
         }
-        next(error);
+        return next(error);
 
     } finally {
         if (pgClient) {
             pgClient.release();
         }
     }
+
+    res.send(result);
 });
 
 // 배너 불러오는 api
@@ -581,15 +577,18 @@ router.get("/:clubId/banner", loginAuth, async (req, res, next) => {
                                             id = $1`;
         const selectClubBannerParam = [clubId];
         const selectClubBannerData = await pool.query(selectClubBannerSql, selectClubBannerParam);
-        if (selectClubBannerData.rowCount !== 0) {
-            result.data = selectClubBannerData.rows[0].banner;
-            return res.send(result);
+        if (selectClubBannerData.rowCount === 0) {
+            throw new BadRequestException("해당하는 동아리가 존재하지 않습니다");
         }
-        throw new BadRequestException("해당하는 동아리가 존재하지 않습니다");
+        result.data = {
+            banner: selectClubBannerData.rows[0].banner
+        }
 
     } catch (error) {
-        next(error);
+        return next(error);
     }
+
+    res.send(result);
 });
 
 module.exports = router;

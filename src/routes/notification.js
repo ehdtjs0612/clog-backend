@@ -84,7 +84,7 @@ router.post("/read-all", loginAuth, async (req, res, next) => {
 
         const find = await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).aggregate(pipeline).toArray()
         const idList = find.map(elem => elem._id)
-        const data = await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).updateMany({ _id: { $in: idList } }, update)
+        await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).updateMany({ _id: { $in: idList } }, update)
 
         result.message = "알림 모두 읽음 처리 성공"
 

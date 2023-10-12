@@ -26,6 +26,11 @@ module.exports = {
         MAX_BOARD_LENGTH: 16
     },
 
+    POST: {
+        MAX_POST_TITLE_LENGTH: 32,
+        MAX_POST_CONTENT_LENGTH: 500
+    },
+
     POSITION: {
         PRESIDENT: 0,   // 회장
         MANAGER: 1,     // 운영진

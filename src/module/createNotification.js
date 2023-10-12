@@ -8,9 +8,9 @@ const { notificationUrl } = require("../module/global")
 const createNotification = async (url, key) => {
     let type
     let sql
-    
+
     switch (url) { // api url에 따라 알림 type과 sql 설정
-        case notificationUrl.clubComment :
+        case notificationUrl.clubComment:
             type = "club_comment"
             sql = `SELECT account_tb.name AS "author", 
                 club_tb.name  AS "club_name",
@@ -103,9 +103,9 @@ const createNotification = async (url, key) => {
         case notificationUrl.gradeUpdate:
             type = "grade_update"
             sql = `SELECT club_member_tb.account_id AS "user_id",
-            club_member_tb.position AS "position",
-            club_tb.name AS "club_name",
-            club_tb.id AS "club_id"
+                club_member_tb.position AS "position",
+                club_tb.name AS "club_name",
+                club_tb.id AS "club_id"
             FROM club_member_tb
             JOIN club_tb ON club_member_tb.club_id = club_tb.id
             WHERE club_member_tb.id = $1`
@@ -114,8 +114,8 @@ const createNotification = async (url, key) => {
         case notificationUrl.joinAccept:
             type = "join_accept"
             sql = `SELECT club_member_tb.account_id AS "user_id",
-            club_tb.name AS "club_name",
-            club_tb.id AS "club_id"
+                club_tb.name AS "club_name",
+                club_tb.id AS "club_id"
             FROM club_member_tb
             JOIN club_tb ON club_member_tb.club_id = club_tb.id
             WHERE club_member_tb.id = $1`
@@ -125,7 +125,7 @@ const createNotification = async (url, key) => {
     }
 
     const selectedData = await pool.query(sql, [key])
-       
+
     if (selectedData.rowCount == 0) throw new BadRequestException("존재하지 않는 알림입니다")
 
     for (let index = 0; index < selectedData.rowCount; index++) { // 몽고디비에 저장하기 위한 필드 추가
@@ -133,7 +133,7 @@ const createNotification = async (url, key) => {
         selectedData.rows[index].is_read = false
     }
     console.log(selectedData.rows)
-    conn = await client.connect(process.env.MONGODB_URL) 
+    conn = await client.connect(process.env.MONGODB_URL)
 
     if (selectedData.rowCount != 0) await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).insertMany(selectedData.rows, { ignoreUndefined: true })
 
@@ -153,6 +153,6 @@ const createNotification = async (url, key) => {
     await conn.close()
 }
 
-createNotification(notificationUrl.clubComment,2)
+createNotification(notificationUrl.clubComment, 2)
 
 module.exports = createNotification 

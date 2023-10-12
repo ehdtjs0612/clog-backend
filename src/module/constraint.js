@@ -13,5 +13,8 @@ module.exports = {
     // NOTICE
     NOTICE_POST_IMG_TB : {
         FK_POST_ID: "fk_notice_post_tb_to_notice_post_img_tb",
-    }
+    },
+
+    FK_BOARD: "fk_club_board_tb_to_club_post_tb",
+    FK_CLUB_POST: "fk_club_post_tb_to_post_img_tb"
 }
