@@ -53,6 +53,14 @@ router.get("/list/post/:postId", loginAuth, async (req, res, next) => {
             throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
         }
         const offset = (page - 1) * COMMENT.MAX_COMMENT_COUNT_PER_POST;
+        const selectCommentCountSql = `SELECT 
+                                            COUNT(*)
+                                        FROM
+                                            club_comment_tb
+                                        WHERE
+                                            club_post_id = $1`;
+        const selectCommentCountParam = [postId];
+        const selectCommentCountData = await pool.query(selectCommentCountSql, selectCommentCountParam);
         const selectCommentsSql = `SELECT 
                                         club_comment_tb.id, 
                                         account_tb.entry_year AS "entryYear", 
@@ -83,6 +91,7 @@ router.get("/list/post/:postId", loginAuth, async (req, res, next) => {
         const selectCommentParam = [userId, postId, offset, COMMENT.MAX_COMMENT_COUNT_PER_POST];
         const selectCommentData = await pool.query(selectCommentsSql, selectCommentParam);
         result.data = {
+            count: selectCommentCountData.rows[0].count,
             comments: selectCommentData.rows
         };
 
@@ -159,8 +168,8 @@ router.post("/", loginAuth, async (req, res, next) => {
 });
 
 // 댓글 수정 api
+// 권한: 해당 동아리에 가입되어있어야 함 && 본인이거나 해당 동아리의 관리자만
 router.put("/", loginAuth, async (req, res, next) => {
-
 });
 
 // 댓글 삭제 api
