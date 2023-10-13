@@ -36,6 +36,10 @@ module.exports = {
         MAX_COMMENT_CONTENT_LENGTH: 300 // 논의 (임시)
     },
 
+    REPLY: {
+        MAX_REPLY_COUNT_PER_COMMENT: 10, // 논의 (임시)
+    },
+
     IMAGE: {
         MAX_POST_COUNT: 3, // 30개
         MAX_PROMOTION_COUNT: 3, // 5개
