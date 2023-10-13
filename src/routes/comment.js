@@ -239,8 +239,72 @@ router.put("/", loginAuth, async (req, res, next) => {
 });
 
 // 댓글 삭제 api
+// 권한: 해당 동아리에 가입되어있어야 함 && 본인이거나 해당 동아리의 관리자만
 router.delete("/", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
+    const { commentId } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    };
 
+    try {
+        validate(commentId, "commentId").checkInput().isNumber();
+
+        const selectAuthSql = `SELECT
+                                    club_comment_tb.account_id AS "accountId",
+                                    (
+                                        SELECT
+                                            club_member_tb.position
+                                        FROM
+                                            club_member_tb
+                                        WHERE
+                                            club_member_tb.account_id = $1
+                                        AND
+                                            club_member_tb.club_id = club_tb.id
+                                    ) AS "position"
+                                FROM
+                                    club_comment_tb
+                                JOIN
+                                    club_post_tb
+                                ON
+                                    club_comment_tb.club_post_id = club_post_tb.id
+                                JOIN
+                                    club_board_tb
+                                ON
+                                    club_post_tb.club_board_id = club_board_tb.id
+                                JOIN
+                                    club_tb
+                                ON
+                                    club_board_tb.club_id = club_tb.id
+                                WHERE
+                                    club_comment_tb.id = $2`;
+        const selectAuthParam = [userId, commentId];
+        const selectAuthResult = await pool.query(selectAuthSql, selectAuthParam);
+        // 수정 권한 체크
+        if (selectAuthResult.rowCount === 0) {
+            throw new BadRequestException("해당하는 댓글이 존재하지 않습니다");
+        }
+        const selectAuthData = selectAuthResult.rows[0];
+        if (selectAuthData.position === null) {
+            throw new BadRequestException("해당 동아리에 가입되어있지 않습니다");
+        }
+        if (selectAuthData.position >= POSITION.MANAGER && selectAuthData.accountId !== userId) {
+            throw new BadRequestException("수정 권한이 없습니다");
+        }
+        // 댓글 삭제 시작
+        const updateCommentSql = `DELETE 
+                                    FROM
+                                        club_comment_tb
+                                    WHERE
+                                        id = $1`;
+        const updateCommentParam = [commentId];
+        await pool.query(updateCommentSql, updateCommentParam);
+
+    } catch (error) {
+        return next(error);
+    }
+    res.send(result);
 });
 
 module.exports = router;
