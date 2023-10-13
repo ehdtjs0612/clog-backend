@@ -353,4 +353,53 @@ router.get("/:noticeId", loginAuth, async (req, res, next) => {
     }
 })
 
+
+// 공지 게시물 댓글 작성
+
+router.post("/comment", loginAuth, async (req, res, next) => {
+    const { noticeId, content } = req.body
+    const userId = req.decoded.id
+    const result = {
+        message: "",
+        data: {}
+    }
+
+
+    let pgClient = null
+
+
+    try {
+        pgClient = await pool.connect()
+        await pgClient.query("BEGIN")
+
+        const selectPositionSql = `SELECT position
+            FROM club_member_tb
+            WHERE account_id = $1
+            AND club_id = (
+                SELECT notice_post_tb.club_id
+                FROM notice_post_tb
+                WHERE notice_post_tb.id = $2 
+            )`
+        const selectPositionParams = [ userId, noticeId ]
+        const selectPositionResult = await pgClient.query(selectPositionSql, selectPositionParams)
+        
+        if (selectPositionResult.rowCount == 0) throw new BadRequestException ("해당 동아리의 부원이 아닙니다")
+
+        const insertCommentsql = `INSERT INTO notice_comment_tb (account_id, notice_post_id, content) 
+            VALUES ($1, $2, $3)`
+        const insertCommentparams = [ userId, noticeId, content ]
+        await pgClient.query(insertCommentsql, insertCommentparams)
+
+        await pgClient.query("COMMIT")
+    } catch (error) {
+        if (pgClient) {
+            await pgClient.query("ROLLBACK")
+        }
+        next(error)
+    } finally {
+        if (pgClient) pgClient.release
+        res.send(result)
+    }
+})
+
 module.exports = router
