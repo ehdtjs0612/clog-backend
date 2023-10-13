@@ -211,7 +211,9 @@ router.post("/", loginAuth, async (req, res, next) => {
                                             FROM 
                                                 club_member_tb 
                                             WHERE 
-                                                club_member_tb.club_id = club_tb.id AND club_member_tb.account_id = $1
+                                                club_member_tb.club_id = club_tb.id 
+                                            AND 
+                                                club_member_tb.account_id = $1
                                         ) AS "accountId" 
                                     FROM 
                                         club_board_tb 
@@ -223,6 +225,10 @@ router.post("/", loginAuth, async (req, res, next) => {
                                         club_board_tb.id = $2`;
         const selectClubAuthParam = [userId, boardId];
         const selectClubAuthData = await pgClient.query(selectClubAuthSql, selectClubAuthParam);
+        if (selectClubAuthData.rowCount === 0) {
+            throw new BadRequestException("해당하는 게시판이 존재하지 않습니다");
+        }
+
         if (!selectClubAuthData.rows[0].accountId) {
             throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
         }
