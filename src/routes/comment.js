@@ -30,20 +30,29 @@ router.post("/", loginAuth, async (req, res, next) => {
                                             FROM 
                                                 club_member_tb 
                                             WHERE 
-                                                account_id = $1 AND club_id = club_tb.id
+                                                club_member_tb.club_id = club_tb.id
+                                            AND 
+                                                club_member_tb.account_id = $1 
                                         ) AS "accountId" 
                                     FROM 
                                         club_post_tb 
                                     JOIN 
-                                        club_board_tb ON club_post_tb.club_board_id = club_board_tb.id 
+                                        club_board_tb 
+                                    ON 
+                                        club_post_tb.club_board_id = club_board_tb.id 
                                     JOIN 
-                                        club_tb ON club_board_tb.club_id = club_tb.id 
+                                        club_tb 
+                                    ON 
+                                        club_board_tb.club_id = club_tb.id 
                                     WHERE 
                                         club_post_tb.id = $2`;
         const selectClubAuthParam = [userId, postId];
         const selectClubAuthData = await pool.query(selectClubAuthSql, selectClubAuthParam);
+        if (selectClubAuthData.rowCount === 0) {
+            throw new BadRequestException("해당하는 게시글이 존재하지 않습니다");
+        }
         if (!selectClubAuthData.rows[0].accountId) {
-            throw new BadRequestException("동아리 부원만 작성 가능합니다");
+            throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
         }
         result.data = selectClubAuthData.rows;
 
