@@ -27,7 +27,7 @@ app.use(cookieParser());
 // api call middleware
 app.use("/account", accountApi);
 app.use("/auth", authApi);
-app.use("/upload", uploadApi);
+// app.use("/upload", uploadApi);
 app.use("/club", clubApi);
 app.use("/notification", notificationApi);
 app.use("/notice", noticeApi);

@@ -67,5 +67,6 @@ module.exports = {
     NOTICE: {
         MAX_TITLE_LENGTH: 20,
         MAX_CONTENT_LENGTH: 500,
+        MAX_COMMENT_CONTENT_LENGTH: 300,
     },
 }

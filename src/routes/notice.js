@@ -364,11 +364,11 @@ router.post("/comment", loginAuth, async (req, res, next) => {
         data: {}
     }
 
-
     let pgClient = null
 
-
     try {
+        validate(noticeId, "noticeId").checkInput().isNumber()
+        validate(content, "content").checkInput().checkLength(1,NOTICE.MAX_COMMENT_CONTENT_LENGTH)
         pgClient = await pool.connect()
         await pgClient.query("BEGIN")
 
