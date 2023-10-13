@@ -7,7 +7,89 @@ const CONSTRAINT = require("../module/constraint");
 const { BadRequestException } = require('../module/customError');
 
 // 게시글의 댓글 리스트 조회 api
+// 권한: 해당 동아리에 가입되어있어야 함.
 router.get("/list/post/:postId", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
+    const { postId } = req.params;
+    const page = req.query.page || 1;
+    const result = {
+        message: "",
+        data: {}
+    }
+
+    try {
+        validate(postId, "post-id").checkInput().isNumber();
+        validate(page, "page").isNumber().isPositive();
+
+        const selectClubAuthSql = `SELECT 
+                                (
+                                    SELECT 
+                                        club_member_tb.id 
+                                    FROM 
+                                        club_member_tb 
+                                    WHERE 
+                                        club_member_tb.club_id = club_tb.id
+                                    AND 
+                                        club_member_tb.account_id = $1 
+                                ) AS "accountId" 
+                            FROM 
+                                club_post_tb 
+                            JOIN 
+                                club_board_tb 
+                            ON 
+                                club_post_tb.club_board_id = club_board_tb.id 
+                            JOIN 
+                                club_tb 
+                            ON 
+                                club_board_tb.club_id = club_tb.id 
+                            WHERE 
+                                club_post_tb.id = $2`;
+        const selectClubAuthParam = [userId, postId];
+        const selectClubAuthData = await pool.query(selectClubAuthSql, selectClubAuthParam);
+        if (selectClubAuthData.rowCount === 0) {
+            throw new BadRequestException("해당하는 게시글이 존재하지 않습니다");
+        }
+        if (!selectClubAuthData.rows[0].accountId) {
+            throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
+        }
+        const offset = (page - 1) * COMMENT.MAX_COMMENT_COUNT_PER_POST;
+        const selectCommentsSql = `SELECT 
+                                        club_comment_tb.id, 
+                                        account_tb.entry_year AS "entryYear", 
+                                        club_comment_tb.content, 
+                                        club_comment_tb.created_at AS "createdAt", 
+                                        account_tb.id AS "authorId", 
+                                        account_tb.name AS "authorName",
+                                        account_tb.personal_color AS "authorPcolor", 
+                                        club_post_tb.account_id = $1 AS "authorState" 
+                                    FROM 
+                                        club_comment_tb 
+                                    JOIN 
+                                        account_tb 
+                                    ON 
+                                        club_comment_tb.account_id = account_tb.id 
+                                    JOIN 
+                                        club_post_tb 
+                                    ON 
+                                        club_comment_tb.club_post_id = club_post_tb.id 
+                                    WHERE 
+                                        club_comment_tb.club_post_id = $2
+                                    ORDER BY
+                                        club_comment_tb.created_at DESC
+                                    OFFSET
+                                        $3
+                                    LIMIT
+                                        $4`;
+        const selectCommentParam = [userId, postId, offset, COMMENT.MAX_COMMENT_COUNT_PER_POST];
+        const selectCommentData = await pool.query(selectCommentsSql, selectCommentParam);
+        result.data = {
+            comments: selectCommentData.rows
+        };
+
+    } catch (error) {
+        return next(error);
+    }
+    res.send(result);
 });
 
 // 댓글 작성 api
