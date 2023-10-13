@@ -66,6 +66,14 @@ router.get("/list/post/:postId", loginAuth, async (req, res, next) => {
                                         account_tb.entry_year AS "entryYear", 
                                         club_comment_tb.content, 
                                         club_comment_tb.created_at AS "createdAt", 
+                                        (
+                                            SELECT
+                                                count(*)::int
+                                            FROM
+                                                club_reply_tb
+                                            WHERE
+                                                club_reply_tb.club_comment_id = club_comment_tb.id
+                                        )::int AS "replyCount",
                                         account_tb.id AS "authorId", 
                                         account_tb.name AS "authorName",
                                         account_tb.personal_color AS "authorPcolor", 
