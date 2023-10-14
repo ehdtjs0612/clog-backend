@@ -259,7 +259,10 @@ router.post("/", loginAuth, async (req, res, next) => {
         if (pgClient) {
             await pgClient.query("ROLLBACK");
         }
-        if (error.constraint === CONSTRAINT.FK_BOARD) {
+        if (error.constraint === CONSTRAINT.FK_ACCOUNT_TO_CLUB_POST_TB) {
+            return next(new BadRequestException("해당하는 사용자가 존재하지 않습니다"));
+        }
+        if (error.constraint === CONSTRAINT.FK_BOARD_TO_CLUB_POST_TB) {
             return next(new BadRequestException("해당하는 게시판이 존재하지 않습니다"));
         }
         return next(error);

@@ -44,7 +44,7 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
                                             $2
                                      LIMIT 
                                             $3`;
-        const selectNoticePostParam = [clubId, offset, CLUB.MAX_POST_COUNT_PER_PAGE];
+        const selectNoticePostParam = [clubId, offset, POST.MAX_POST_COUNT_PER_PAGE];
         const noticeAllCountData = await pool.query(selectNoticeAllCountSql);
         const noticePostData = await pool.query(selectNoticePostSql, selectNoticePostParam);
         if (noticePostData.rowCount === 0) {
