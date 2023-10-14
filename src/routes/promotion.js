@@ -21,8 +21,18 @@ router.get("/:promotionId", loginAuth, async (req, res, next) => {
                                         club_tb.name AS "clubName", 
                                         club_tb.profile_img AS "profileImage", 
                                         promotion_tb.title, 
-                                        promotion_tb.content, 
-                                        promotion_tb.created_at AS "createdAt",
+                                        promotion_tb.content,
+                                        ARRAY (
+                                            SELECT
+                                                promotion_img_tb.post_img
+                                            FROM
+                                                promotion_img_tb
+                                            WHERE
+                                                promotion_img_tb.post_id = $1
+                                        ) AS "promotionImage",
+                                        TO_CHAR(
+                                            promotion_tb.created_at, 'YYYY.mm.dd'
+                                        ) AS "createdAt",
                                         COALESCE(
                                         (
                                             SELECT
@@ -32,7 +42,7 @@ router.get("/:promotionId", loginAuth, async (req, res, next) => {
                                             WHERE
                                                 club_member_tb.club_id = club_tb.id
                                             AND
-                                                club_member_tb.account_id = $1
+                                                club_member_tb.account_id = $2
                                         ), false) AS "adminState"
                                     FROM
                                         promotion_tb
@@ -41,8 +51,8 @@ router.get("/:promotionId", loginAuth, async (req, res, next) => {
                                     ON
                                         promotion_tb.club_id = club_tb.id
                                     WHERE
-                                        promotion_tb.id = $2`;
-        const selectPromotionParam = [userId, promotionId];
+                                        promotion_tb.id = $3`;
+        const selectPromotionParam = [promotionId, userId, promotionId];
         const selectPromotionData = await pool.query(selectPromotionSql, selectPromotionParam);
         if (selectPromotionData.rowCount === 0) {
             throw new BadRequestException("해당하는 홍보물이 존재하지 않습니다");
