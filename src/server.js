@@ -15,6 +15,7 @@ const boardApi = require("./routes/board");
 const postApi = require("./routes/post");
 const commentApi = require("./routes/comment");
 const replyApi = require("./routes/reply");
+const promotionApi = require("./routes/promotion");
 
 const errorHandling = require("./middleware/errorHandling");
 
@@ -36,6 +37,7 @@ app.use("/board", boardApi);
 app.use("/post", postApi);
 app.use("/comment", commentApi);
 app.use("/reply", replyApi);
+app.use("/promotion", promotionApi);
 
 // error handling muddleware
 app.use(errorHandling());
