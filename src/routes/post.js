@@ -148,28 +148,24 @@ router.get("/:postId", loginAuth, async (req, res, next) => {
                                         account_tb.entry_year AS "authorEntryYear", 
                                         club_post_tb.title AS "postTitle", 
                                         club_post_Tb.content AS "postContent", 
-                                        ARRAY_REMOVE(ARRAY_AGG(post_img_tb.post_img), NULL) AS "postImages",
                                         TO_CHAR(club_post_tb.created_at, 'yyyy.mm.dd') AS "createdAt",
-                                        club_post_tb.account_id = $2 AS "authorState"
+                                        club_post_tb.account_id = $2 AS "authorState",
+                                        ARRAY (
+                                            SELECT
+                                                concat(post_img),
+                                            FROM
+                                                post_img_tb
+                                            WHERE
+                                                post_id = $1
+                                        ) AS "postImgArray"
                                FROM 
                                         club_post_tb 
                                JOIN 
                                         account_tb ON club_post_tb.account_id = account_tb.id 
                                JOIN 
                                         major_tb ON account_tb.major = major_tb.id 
-                               LEFT JOIN 
-                                        post_img_tb ON club_post_tb.id = post_img_tb.post_id 
                                WHERE 
-                                        club_post_tb.id = $1
-                               GROUP BY 
-                                        club_post_tb.account_id, 
-                                        major_tb.name, 
-                                        account_tb.name, 
-                                        account_tb.personal_color, 
-                                        account_tb.entry_year, 
-                                        club_post_tb.title, 
-                                        club_post_tb.content, 
-                                        club_post_tb.created_at`;
+                                        club_post_tb.id = $1`;
         const selectPostParam = [postId, userId];
         const selectPostData = await pool.query(selectPostSql, selectPostParam);
         if (selectPostData.rowCount !== 0) {
