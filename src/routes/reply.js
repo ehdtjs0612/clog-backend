@@ -288,4 +288,64 @@ router.put("/", loginAuth, async (req, res, next) => {
     res.send(result);
 });
 
+// 대댓글 삭제 api
+// 권한: 본인이거나 해당 동아리의 운영진이거나
+router.delete("/", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
+    const { replyId } = req.body;
+
+    try {
+        validate(replyId, "replyId").checkInput().isNumber();
+
+        // 권한 체크
+        const selectAuthSql = `SELECT
+                                    club_reply_tb.account_id AS "accountId",
+                                    (
+                                        SELECT
+                                            club_member_tb.position
+                                        FROM
+                                            club_member_tb
+                                        WHERE
+                                            club_member_tb.account_id = $1
+                                        AND
+                                            club_member_tb.club_id = club_tb.id
+                                    ) AS "position"
+                                FROM
+                                    club_reply_tb
+                                JOIN
+                                    club_comment_tb
+                                ON
+                                    club_reply_tb.club_comment_id = club_comment_tb.id
+                                JOIN
+                                    club_post_tb
+                                ON
+                                    club_comment_tb.club_post_id = club_post_tb.id
+                                JOIN
+                                    club_board_tb
+                                ON
+                                    club_post_tb.club_board_id = club_board_tb.id
+                                JOIN
+                                    club_tb
+                                ON
+                                    club_board_tb.club_id = club_tb.id
+                                WHERE
+                                    club_reply_tb.id = $2`;
+        const selectAuthParam = [userId, replyId];
+        const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
+        if (selectAuthData.rowCount === 0) {
+            throw new BadRequestException("해당하는 댓글이 존재하지 않습니다");
+        }
+        if (selectAuthData.rows[0].position === null) {
+            throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
+        }
+        if (selectAuthData.rows[0].accountId !== userId && selectAuthData.rows[0].position >= POSITION.MANAGER) {
+            throw new BadRequestException("삭제 권한이 존재하지 않습니다");
+        }
+
+    } catch (error) {
+        return next(error);
+    }
+    res.send(result);
+});
+
 module.exports = router;
