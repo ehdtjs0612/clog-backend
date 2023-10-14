@@ -148,7 +148,7 @@ router.get("/:postId", loginAuth, async (req, res, next) => {
                                         account_tb.entry_year AS "authorEntryYear", 
                                         club_post_tb.title AS "postTitle", 
                                         club_post_Tb.content AS "postContent", 
-                                        ARRAY_AGG(post_img_tb.post_img) AS "postImages",
+                                        ARRAY_REMOVE(ARRAY_AGG(post_img_tb.post_img), NULL) AS "postImages",
                                         TO_CHAR(club_post_tb.created_at, 'yyyy.mm.dd') AS "createdAt",
                                         club_post_tb.account_id = $2 AS "authorState"
                                FROM 
