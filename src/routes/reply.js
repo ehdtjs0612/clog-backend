@@ -2,7 +2,8 @@ const router = require("express").Router();
 const pool = require('../../config/database/postgresql');
 const loginAuth = require('../middleware/auth/loginAuth');
 const { BadRequestException } = require('../module/customError');
-const { REPLY } = require('../module/global');
+const { REPLY, POSITION } = require('../module/global');
+const CONSTRAINT = require("../module/constraint");
 const validate = require('../module/validation');
 
 // 댓글의 답글 리스트를 조회
@@ -129,6 +130,157 @@ router.get("/list/comment/:commentId", loginAuth, async (req, res, next) => {
         result.data = {
             replys: selectReplyData.rows
         }
+
+    } catch (error) {
+        return next(error);
+    }
+    res.send(result);
+});
+
+// 대댓글 작성 api
+// 권한: 해당 동아리에 가입되어있어야 함
+router.post("/", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
+    const { commentId, content } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(commentId, "commentId").checkInput().isNumber();
+        validate(content, "content").checkInput().checkLength(1, REPLY.MAX_REPLY_CONTENT_LENGTH);
+
+        // 권한 체크 (동아리에 가입되어있는 사용자인지)
+        const selectClubAuthSql = `SELECT
+                                        club_comment_tb.account_id AS "accountId",
+                                        (
+                                            SELECT
+                                                club_member_tb.position
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.club_id = club_tb.id
+                                            AND
+                                                club_member_tb.account_id = $1
+                                        ) AS "position"
+                                    FROM
+                                        club_comment_tb
+                                    JOIN
+                                        club_post_tb
+                                    ON
+                                        club_comment_tb.club_post_id = club_post_tb.id
+                                    JOIN
+                                        club_board_tb
+                                    ON
+                                        club_post_tb.club_board_id = club_board_id
+                                    JOIN
+                                        club_tb
+                                    ON
+                                        club_board_tb.club_id = club_tb.id
+                                    WHERE
+                                        club_comment_tb.id = $2`;
+        const selectClubAuthParam = [userId, commentId];
+        const selectClubAuthData = await pool.query(selectClubAuthSql, selectClubAuthParam);
+        console.log(selectClubAuthData.rows)
+        if (selectClubAuthData.rowCount === 0) {
+            throw new BadRequestException("해당하는 댓글이 존재하지 않습니다");
+        }
+        if (selectClubAuthData.rows[0].position === null) {
+            throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
+        }
+        // 대댓글 작성
+        const insertReplySql = `INSERT INTO
+                                            club_reply_tb (account_id, club_comment_id, content)
+                                        VALUES
+                                            ($1, $2, $3)
+                                        RETURNING
+                                            id`;
+        const insertReplyParam = [userId, commentId, content];
+        const insertReplyData = await pool.query(insertReplySql, insertReplyParam);
+        result.data = {
+            replys: insertReplyData.rows[0].id
+        };
+    } catch (error) {
+        if (error.constraint === CONSTRAINT.FK_ACCOUNT_TO_CLUB_REPLY_TB) {
+            throw new BadRequestException("해당하는 사용자가 존재하지 않습니다");
+        }
+        if (error.constraint === CONSTRAINT.FK_COMMENT_TO_CLUB_REPLY_TB) {
+            throw new BadRequestException("해당하는 댓글이 존재하지 않습니다");
+        }
+        return next(error);
+    }
+    res.send(result);
+});
+
+// 대댓글 수정 api
+// 권한: 본인이거나 해당 동아리의 운영진이거나
+router.put("/", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
+    const { replyId, content } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(replyId, "replyId").checkInput().isNumber();
+        validate(content, "content").checkInput().checkLength(1, REPLY.MAX_REPLY_CONTENT_LENGTH);
+
+        // 권한 체크
+        const selectAuthSql = `SELECT
+                                    club_reply_tb.account_id AS "accountId",
+                                    (
+                                        SELECT
+                                            club_member_tb.position
+                                        FROM
+                                            club_member_tb
+                                        WHERE
+                                            club_member_tb.account_id = $1
+                                        AND
+                                            club_member_tb.club_id = club_tb.id
+                                    ) AS "position"
+                                FROM
+                                    club_reply_tb
+                                JOIN
+                                    club_comment_tb
+                                ON
+                                    club_reply_tb.club_comment_id = club_comment_tb.id
+                                JOIN
+                                    club_post_tb
+                                ON
+                                    club_comment_tb.club_post_id = club_post_tb.id
+                                JOIN
+                                    club_board_tb
+                                ON
+                                    club_post_tb.club_board_id = club_board_tb.id
+                                JOIN
+                                    club_tb
+                                ON
+                                    club_board_tb.club_id = club_tb.id
+                                WHERE
+                                    club_reply_tb.id = $2`;
+        const selectAuthParam = [userId, replyId];
+        const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
+        if (selectAuthData.rowCount === 0) {
+            throw new BadRequestException("해당하는 댓글이 존재하지 않습니다");
+        }
+        if (selectAuthData.rows[0].position === null) {
+            throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
+        }
+        if (selectAuthData.rows[0].accountId !== userId && selectAuthData.rows[0].position >= POSITION.MANAGER) {
+            throw new BadRequestException("수정 권한이 존재하지 않습니다");
+        }
+
+        // 댓글 수정 시작
+        const updateReplySql = `UPDATE
+                                    club_reply_tb
+                                SET
+                                    content = $1
+                                WHERE
+                                    id = $2`;
+        const updateReplyParam = [content, replyId];
+        await pool.query(updateReplySql, updateReplyParam);
 
     } catch (error) {
         return next(error);
