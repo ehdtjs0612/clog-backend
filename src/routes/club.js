@@ -66,13 +66,13 @@ router.post("/", loginAuth, async (req, res, next) => {
         if (error.constraint === CONSTRAINT.UNIQUE_CLUB_NAME) {
             next(new BadRequestException("이미 존재하는 동아리 이름입니다"))
         }
-        if (error.constraint === CONSTRAINT.FK_BELONG) {
+        if (error.constraint === CONSTRAINT.FK_BELONG_TO_CLUB_TB) {
             next(new BadRequestException("해당하는 소속이 존재하지 않습니다"));
         }
-        if (error.constraint === CONSTRAINT.FK_BIG_CATEGORY) {
+        if (error.constraint === CONSTRAINT.FK_BIG_CATEGORY_TO_CLUB_TB) {
             next(new BadRequestException("해당하는 대분류가 존재하지 않습니다"));
         }
-        if (error.constraint === CONSTRAINT.FK_SMALL_CATEGORY) {
+        if (error.constraint === CONSTRAINT.FK_SMALL_CATEGORY_TO_CLUB_TB) {
             next(new BadRequestException("해당하는 소분류가 존재하지 않습니다"));
         }
         return next(error);
@@ -259,7 +259,10 @@ router.post("/join-request", loginAuth, async (req, res, next) => {
         }
 
     } catch (error) {
-        if (error.constraint === CONSTRAINT.FK_CLUB) {
+        if (error.constraint === CONSTRAINT.FK_ACCOUNT_TO_JOIN_REQUEST_TB) {
+            return next(new BadRequestException("해당하는 사용자가 존재하지 않습니다"));
+        }
+        if (error.constraint === CONSTRAINT.FK_CLUB_TO_JOIN_REQUEST_TB) {
             return next(new BadRequestException("해당하는 동아리가 존재하지 않습니다"));
         }
         return next(error);
@@ -360,8 +363,14 @@ router.post("/member", loginAuth, authCheck(POSITION.MANAGER), async (req, res, 
         if (pgClient) {
             await pgClient.query("ROLLBACK");
         }
-        if (error.constraint === CONSTRAINT.FK_ACCOUNT) {
+        if (error.constrinat === CONSTRAINT.FK_CLUB_TO_CLUB_MEMBER_TB) {
+            return next(new BadRequestException("해당하는 동아리가 존재하지 않습니다"));
+        }
+        if (error.constraint === CONSTRAINT.FK_ACCOUNT_TO_CLUB_MEMBER_TB) {
             return next(new BadRequestException("해당하는 사용자가 존재하지 않습니다"));
+        }
+        if (error.constraint === CONSTRAINT.FK_POSITION_TO_CLUB_POSITION_TB) {
+            return next(new BadRequestException("해당하는 직급이 존재하지 않습니다"));
         }
         return next(error);
     } finally {

@@ -153,7 +153,6 @@ router.post("/", loginAuth, async (req, res, next) => {
         if (!selectClubAuthData.rows[0].accountId) {
             throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
         }
-        result.data = selectClubAuthData.rows;
 
         const insertCommentSql = `INSERT INTO
                                             club_comment_tb (account_id, club_post_id, content)
@@ -167,6 +166,9 @@ router.post("/", loginAuth, async (req, res, next) => {
             commentId: insertCommentData.rows[0].id
         }
     } catch (error) {
+        if (error.constraint === CONSTRAINT.FK_ACCOUNT_TO_COMMENT_TB) {
+            return next(new BadRequestException("해당하는 사용자가 존재하지 않습니다"));
+        }
         if (error.constraint === CONSTRAINT.FK_CLUB_POST_TO_COMMENT_TB) {
             return next(new BadRequestException("해당하는 게시글이 존재하지 않습니다"));
         }
