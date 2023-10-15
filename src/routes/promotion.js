@@ -226,4 +226,59 @@ router.put("/", loginAuth, async (req, res, next) => {
     res.send(result);
 });
 
+// 홍보글 삭제 api
+// 권한: 동아리의 관리자
+router.delete("/", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
+    const { promotionId } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(promotionId, "promotionId").checkInput().isNumber();
+
+        // 권한 체크
+        const selectAuthSql = `SELECT
+                                    (
+                                        SELECT
+                                            club_member_tb.position
+                                        FROM
+                                            club_member_tb
+                                        WHERE
+                                            club_member_tb.club_id = club_tb.id
+                                        AND
+                                            club_member_tb.account_id = $1
+                                    ) AS "position"
+                                FROM
+                                    promotion_tb
+                                JOIN
+                                    club_tb
+                                ON
+                                    promotion_tb.club_id = club_tb.id
+                                WHERE
+                                    promotion_tb.id = $2`;
+        const selectAuthParam = [userId, promotionId];
+        const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
+        if (selectAuthData.rowCount === 0) {
+            throw new BadRequestException("해당하는 홍보물이 존재하지 않습니다");
+        }
+        if (selectAuthData.rows[0].position >= POSITION.MANAGER) {
+            throw new BadRequestException("삭제 권한이 없습니다");
+        }
+        // 삭제 시작
+        const deletePromotionSql = `DELETE FROM
+                                            promotion_tb
+                                        WHERE
+                                            id = $1`;
+        const deletePromotionParam = [promotionId];
+        await pool.query(deletePromotionSql, deletePromotionParam);
+        // 삭제 종료
+    } catch (error) {
+        return next(error);
+    }
+    res.send(result);
+});
+
 module.exports = router;
