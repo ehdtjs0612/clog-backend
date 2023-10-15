@@ -505,6 +505,7 @@ router.get("/member/:clubId/list", loginAuth, async (req, res, next) => {
 
 // 직급 변경시켜주는 api
 router.put("/position", loginAuth, authCheck(POSITION.PRESIDENT), async (req, res, next) => {
+    const decodedId = req.decoded.id;
     const { userId, clubId, position } = req.body;
     const result = {
         message: "",
@@ -518,7 +519,10 @@ router.put("/position", loginAuth, authCheck(POSITION.PRESIDENT), async (req, re
         validate(position, "position").checkInput().isNumber();
 
         pgClient = await pool.connect();
-
+        // 0. 본인 권한을 직접 옮기는건 X
+        if (decodedId === Number(userId)) {
+            throw new BadRequestException("본인 권한은 변경할수 없습니다");
+        }
         // 1. 회장이 권한을 다른사람에게 넘길 경우, 먼저 기존 회장의(본인의) 직급을 동아리 운영진으로 변환시켜주고
         await pgClient.query("BEGIN");
         if (position === POSITION.PRESIDENT) {
@@ -563,7 +567,7 @@ router.put("/position", loginAuth, authCheck(POSITION.PRESIDENT), async (req, re
         if (pgClient) {
             await pgClient.query("ROLLBACK");
         }
-        if (error.constraint === CONSTRAINT.FK_POSITION) {
+        if (error.constraint === CONSTRAINT.FK_POSITION_TO_CLUB_POSITION_TB) {
             return next(new BadRequestException("해당하는 직급이 존재하지 않습니다"));
         }
         return next(error);
