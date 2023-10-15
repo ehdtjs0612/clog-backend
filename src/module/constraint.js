@@ -25,12 +25,17 @@ module.exports = {
     FK_BOARD_TO_CLUB_POST_TB: "fk_club_board_tb_to_club_post_tb",
     FK_ACCOUNT_TO_CLUB_POST_TB: "fk_account_tb_to_club_post_tb",
     FK_POST_TO_POST_IMG_TB: "fk_club_post_tb_to_post_img_tb",
-
     // 일반게시글에 댓글 작성 시 fk제약
     FK_ACCOUNT_TO_COMMENT_TB: "fk_account_tb_to_club_comment_tb",
     FK_CLUB_POST_TO_COMMENT_TB: "fk_club_post_tb_to_club_comment_tb",
-
     // 일반게시글에 답글 작성 시 fk제약
     FK_ACCOUNT_TO_CLUB_REPLY_TB: "fk_account_tb_to_club_reply_tb",
-    FK_COMMENT_TO_CLUB_REPLY_TB: "fk_club_comment_tb_to_club_reply_tb"
+    FK_COMMENT_TO_CLUB_REPLY_TB: "fk_club_comment_tb_to_club_reply_tb",
+
+    // 홍보게시글 작성 시 fk제약
+    FK_CLUB_TO_PROMOTION_POST_TB: "fk_club_tb_to_promotion_post_tb",
+    // 홍보 게시글에 댓글 작성시 fk제약
+    FK_ACCOUNT_TO_PROMOTION_COMMENT_TB: "fk_account_tb_to_promotion_comment_tb",
+    FK_PROMOTION_TO_PROMOTION_COMMENT_TB: "fk_promotion_post_tb_to_promotion_comment_tb",
+    // 홍보 게시글에 답글 작성 시 fk제약
 }
