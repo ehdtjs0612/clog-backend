@@ -1,10 +1,10 @@
 const router = require("express").Router();
-const pool = require('../../config/database/postgresql');
-const loginAuth = require('../middleware/auth/loginAuth');
-const validate = require('../module/validation');
-const { COMMENT, POSITION } = require('../module/global');
-const CONSTRAINT = require("../module/constraint");
-const { BadRequestException } = require('../module/customError');
+const pool = require("../../../config/database/postgresql");
+const loginAuth = require('../../middleware/auth/loginAuth');
+const validate = require('../../module/validation');
+const { COMMENT, POSITION } = require('../../module/global');
+const CONSTRAINT = require("../../module/constraint");
+const { BadRequestException } = require('../../module/customError');
 
 // 게시글의 댓글 리스트 조회 api
 // 권한: 해당 동아리에 가입되어있어야 함.
@@ -66,8 +66,30 @@ router.get("/list/post/:postId", loginAuth, async (req, res, next) => {
                                         account_tb.entry_year AS "entryYear", 
                                         club_comment_tb.content, 
                                         club_comment_tb.created_at AS "createdAt", 
+                                        (
+                                            SELECT
+                                                count(*)::int
+                                            FROM
+                                                club_reply_tb
+                                            WHERE
+                                                club_reply_tb.club_comment_id = club_comment_tb.id
+                                        )::int AS "replyCount",
                                         account_tb.id AS "authorId", 
                                         account_tb.name AS "authorName",
+                                        (
+                                            SELECT
+                                                position_tb.name
+                                            FROM
+                                                club_member_tb
+                                            JOIN
+                                                position_tb
+                                            ON
+                                                club_member_tb.position = position_tb.id
+                                            WHERE
+                                                club_member_tb.account_id = account_tb.id
+                                            AND
+                                                club_member_tb.club_id = club_tb.id
+                                        ) AS "authorPosition",
                                         account_tb.personal_color AS "authorPcolor", 
                                         club_post_tb.account_id = $1 AS "authorState" 
                                     FROM 
@@ -80,6 +102,14 @@ router.get("/list/post/:postId", loginAuth, async (req, res, next) => {
                                         club_post_tb 
                                     ON 
                                         club_comment_tb.club_post_id = club_post_tb.id 
+                                    JOIN
+                                        club_board_tb
+                                    ON
+                                        club_post_tb.club_board_id = club_board_tb.id
+                                    JOIN
+                                        club_tb
+                                    ON
+                                        club_board_tb.club_id = club_tb.id
                                     WHERE 
                                         club_comment_tb.club_post_id = $2
                                     ORDER BY
@@ -145,7 +175,6 @@ router.post("/", loginAuth, async (req, res, next) => {
         if (!selectClubAuthData.rows[0].accountId) {
             throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
         }
-        result.data = selectClubAuthData.rows;
 
         const insertCommentSql = `INSERT INTO
                                             club_comment_tb (account_id, club_post_id, content)
@@ -159,6 +188,9 @@ router.post("/", loginAuth, async (req, res, next) => {
             commentId: insertCommentData.rows[0].id
         }
     } catch (error) {
+        if (error.constraint === CONSTRAINT.FK_ACCOUNT_TO_COMMENT_TB) {
+            return next(new BadRequestException("해당하는 사용자가 존재하지 않습니다"));
+        }
         if (error.constraint === CONSTRAINT.FK_CLUB_POST_TO_COMMENT_TB) {
             return next(new BadRequestException("해당하는 게시글이 존재하지 않습니다"));
         }

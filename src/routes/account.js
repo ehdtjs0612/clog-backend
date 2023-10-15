@@ -39,11 +39,11 @@ router.post("/", async (req, res, next) => {
         res.send(result);
 
     } catch (error) {
-        if (error.constraint === CONSTRAINT.UNIQUE_ACCOUNT_EMAIL) {
+        if (error.constraint === CONSTRAINT.UNIQUE_EMAIL_TO_ACCOUNT_TB) {
             return next(new BadRequestException("중복된 이메일이 존재합니다"));
         }
-        if (error.constraint === CONSTRAINT.FK_MAJOR) {
-            return next(new BadRequestException("해당하는 전공이 없습니다"));
+        if (error.constraint === CONSTRAINT.FK_MAJOR_TO_ACCOUNT_TB) {
+            return next(new BadRequestException("해당하는 전공이 존재하지 않습니다"));
         }
         next(error);
     }

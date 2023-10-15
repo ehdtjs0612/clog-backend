@@ -31,9 +31,25 @@ module.exports = {
         MAX_POST_COUNT_PER_PAGE: 10
     },
 
+    PROMOTION: {
+        MAX_PROMOTION_TITLE_LENGTH: 32,
+        MAX_PROMOTION_CONTENT_LENGTH: 500,
+        MAX_PROMOTION_COUNT_PER_PAGE: 10 // 논의(임시),
+    },
+
     COMMENT: {
         MAX_COMMENT_COUNT_PER_POST: 10, // 논의 (임시)
         MAX_COMMENT_CONTENT_LENGTH: 300 // 논의 (임시)
+    },
+
+    PROMOTION_COMMENT: {
+        MAX_COMMENT_COUNT_PER_POST: 10, // 논의 (임시)
+        MAX_COMMENT_CONTENT_LENGTH: 300, // 논의 (임시)
+    },
+
+    REPLY: {
+        MAX_REPLY_COUNT_PER_COMMENT: 10, // 논의 (임시)
+        MAX_REPLY_CONTENT_LENGTH: 300
     },
 
     IMAGE: {

@@ -66,13 +66,13 @@ router.post("/", loginAuth, async (req, res, next) => {
         if (error.constraint === CONSTRAINT.UNIQUE_CLUB_NAME) {
             next(new BadRequestException("이미 존재하는 동아리 이름입니다"))
         }
-        if (error.constraint === CONSTRAINT.FK_BELONG) {
+        if (error.constraint === CONSTRAINT.FK_BELONG_TO_CLUB_TB) {
             next(new BadRequestException("해당하는 소속이 존재하지 않습니다"));
         }
-        if (error.constraint === CONSTRAINT.FK_BIG_CATEGORY) {
+        if (error.constraint === CONSTRAINT.FK_BIG_CATEGORY_TO_CLUB_TB) {
             next(new BadRequestException("해당하는 대분류가 존재하지 않습니다"));
         }
-        if (error.constraint === CONSTRAINT.FK_SMALL_CATEGORY) {
+        if (error.constraint === CONSTRAINT.FK_SMALL_CATEGORY_TO_CLUB_TB) {
             next(new BadRequestException("해당하는 소분류가 존재하지 않습니다"));
         }
         return next(error);
@@ -100,7 +100,17 @@ router.get("/:clubId/profile", loginAuth, authCheck(POSITION.MEMBER), async (req
                                         big_category_tb.name AS "bigCategory", 
                                         small_category_tb.name AS "smallCategory", 
                                         club_tb.profile_img AS "profileImage", 
+                                        club_tb.banner_img AS "bannerImage",
                                         club_tb.cover AS "cover", 
+                                        club_tb.theme_color AS "themeColor",
+                                        (
+                                            SELECT
+                                                COUNT(*)
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.club_id = club_tb.id
+                                        ) AS "memberCount",
                                         club_tb.created_at AS "createdAt"
                                  FROM 
                                         club_tb
@@ -259,7 +269,10 @@ router.post("/join-request", loginAuth, async (req, res, next) => {
         }
 
     } catch (error) {
-        if (error.constraint === CONSTRAINT.FK_CLUB) {
+        if (error.constraint === CONSTRAINT.FK_ACCOUNT_TO_JOIN_REQUEST_TB) {
+            return next(new BadRequestException("해당하는 사용자가 존재하지 않습니다"));
+        }
+        if (error.constraint === CONSTRAINT.FK_CLUB_TO_JOIN_REQUEST_TB) {
             return next(new BadRequestException("해당하는 동아리가 존재하지 않습니다"));
         }
         return next(error);
@@ -360,8 +373,14 @@ router.post("/member", loginAuth, authCheck(POSITION.MANAGER), async (req, res, 
         if (pgClient) {
             await pgClient.query("ROLLBACK");
         }
-        if (error.constraint === CONSTRAINT.FK_ACCOUNT) {
+        if (error.constrinat === CONSTRAINT.FK_CLUB_TO_CLUB_MEMBER_TB) {
+            return next(new BadRequestException("해당하는 동아리가 존재하지 않습니다"));
+        }
+        if (error.constraint === CONSTRAINT.FK_ACCOUNT_TO_CLUB_MEMBER_TB) {
             return next(new BadRequestException("해당하는 사용자가 존재하지 않습니다"));
+        }
+        if (error.constraint === CONSTRAINT.FK_POSITION_TO_CLUB_POSITION_TB) {
+            return next(new BadRequestException("해당하는 직급이 존재하지 않습니다"));
         }
         return next(error);
     } finally {
@@ -486,6 +505,7 @@ router.get("/member/:clubId/list", loginAuth, async (req, res, next) => {
 
 // 직급 변경시켜주는 api
 router.put("/position", loginAuth, authCheck(POSITION.PRESIDENT), async (req, res, next) => {
+    const decodedId = req.decoded.id;
     const { userId, clubId, position } = req.body;
     const result = {
         message: "",
@@ -499,7 +519,10 @@ router.put("/position", loginAuth, authCheck(POSITION.PRESIDENT), async (req, re
         validate(position, "position").checkInput().isNumber();
 
         pgClient = await pool.connect();
-
+        // 0. 본인 권한을 직접 옮기는건 X
+        if (decodedId === Number(userId)) {
+            throw new BadRequestException("본인 권한은 변경할수 없습니다");
+        }
         // 1. 회장이 권한을 다른사람에게 넘길 경우, 먼저 기존 회장의(본인의) 직급을 동아리 운영진으로 변환시켜주고
         await pgClient.query("BEGIN");
         if (position === POSITION.PRESIDENT) {
@@ -544,7 +567,7 @@ router.put("/position", loginAuth, authCheck(POSITION.PRESIDENT), async (req, re
         if (pgClient) {
             await pgClient.query("ROLLBACK");
         }
-        if (error.constraint === CONSTRAINT.FK_POSITION) {
+        if (error.constraint === CONSTRAINT.FK_POSITION_TO_CLUB_POSITION_TB) {
             return next(new BadRequestException("해당하는 직급이 존재하지 않습니다"));
         }
         return next(error);

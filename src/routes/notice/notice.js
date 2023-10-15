@@ -1,12 +1,9 @@
 const router = require("express").Router();
-const pool = require("../../config/database/postgresql");
-const loginAuth = require("../middleware/auth/loginAuth");
-const validate = require("../module/validation");
-const { CLUB } = require("../module/global");
-const { NOTICE } = require("../module/global")
-const { BadRequestException } = require("../module/customError");
-const res = require("express/lib/response");
-const { user } = require("pg/lib/defaults");
+const pool = require("../../../config/database/postgresql");
+const loginAuth = require("../../middleware/auth/loginAuth");
+const validate = require("../../module/validation");
+const { CLUB, POST, NOTICE } = require("../../module/global");
+const { BadRequestException } = require("../../module/customError");
 
 // 동아리 공지 게시물 불러오는 api
 router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
@@ -21,7 +18,7 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
         validate(clubId, "clubId").checkInput().isNumber();
         validate(page, 'page').isNumber().isPositive();
 
-        const offset = (page - 1) * CLUB.MAX_POST_COUNT_PER_PAGE;
+        const offset = (page - 1) * POST.MAX_POST_COUNT_PER_PAGE;
         const selectNoticeAllCountSql = `SELECT
                                                 count(*)::int
                                           FROM
@@ -47,7 +44,7 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
                                             $2
                                      LIMIT 
                                             $3`;
-        const selectNoticePostParam = [clubId, offset, CLUB.MAX_POST_COUNT_PER_PAGE];
+        const selectNoticePostParam = [clubId, offset, POST.MAX_POST_COUNT_PER_PAGE];
         const noticeAllCountData = await pool.query(selectNoticeAllCountSql);
         const noticePostData = await pool.query(selectNoticePostSql, selectNoticePostParam);
         if (noticePostData.rowCount === 0) {
@@ -304,6 +301,8 @@ router.get("/:noticeId", loginAuth, async (req, res, next) => {
     try {
         pgClient = await pool.connect()
         await pgClient.query("BEGIN")
+
+        // 게시물 조회
         const selectNoticeSql = `SELECT account_tb.id AS "authorId",
                 account_tb.name AS "authorName",
                 account_tb.personal_color AS "authorPersonalColor",
@@ -326,6 +325,7 @@ router.get("/:noticeId", loginAuth, async (req, res, next) => {
 
         result.data = selectNoticeResult.rows[0]
 
+        // 직급 체크
         const selectPositionSql = `SELECT position
             FROM club_member_tb
             WHERE account_id = $1
@@ -369,6 +369,7 @@ router.post("/comment", loginAuth, async (req, res, next) => {
         pgClient = await pool.connect()
         await pgClient.query("BEGIN")
 
+        // 작성 권한 체크
         const selectPositionSql = `SELECT position
             FROM club_member_tb
             WHERE account_id = $1
@@ -382,6 +383,7 @@ router.post("/comment", loginAuth, async (req, res, next) => {
         
         if (selectPositionResult.rowCount == 0) throw new BadRequestException ("해당 동아리의 부원이 아닙니다")
 
+        // 공지 댓글 작성
         const insertCommentsql = `INSERT INTO notice_comment_tb (account_id, notice_post_id, content) 
             VALUES ($1, $2, $3)`
         const insertCommentparams = [ userId, noticeId, content ]
@@ -417,12 +419,14 @@ router.put("/comment", loginAuth, async (req, res, next) => {
         pgClient = await pool.connect()
         await pgClient.query("BEGIN")
 
+        // 공지 답글 수정
         const updateCommentSql = `UPDATE notice_comment_tb
             SET content = $1
             WHERE notice_comment_tb.id = $2 AND notice_comment_tb.account_id = $3`
         const updateCommentParams = [content, commentId, userId]
         const updateCommentResult = await pgClient.query(updateCommentSql,updateCommentParams)
         
+        // 댓글이 없거나, 내가 작성한 댓글이 아닌 경우
         if (updateCommentResult.rowCount == 0) throw new BadRequestException ("수정 가능한 댓글이 없습니다")
 
         await pgClient.query("COMMIT")
@@ -454,11 +458,13 @@ router.delete("/comment", loginAuth, async (req, res, next) => {
         pgClient = await pool.connect()
         await pgClient.query("BEGIN")
 
+        // 공지 댓글 삭제
         const deleteCommentSql = `DELETE FROM notice_comment_tb
             WHERE notice_comment_tb.id = $1 AND notice_comment_tb.account_id = $2`
         const deleteCommentParams = [commentId, userId]
         const deleteCommentResult = await pgClient.query(deleteCommentSql,deleteCommentParams)
 
+        // 댓글이 없거나 내가 작성한 댓글이 아닌 경우
         if (deleteCommentResult.rowCount == 0) throw new BadRequestException("삭제 가능한 댓글이 없습니다")
 
         await pgClient.query("COMMIT")
@@ -490,6 +496,7 @@ router.get("/:noticeId/comment/list", loginAuth, async (req, res, next) => {
         pgClient = await pool.connect()
         await pgClient.query("BEGIN")
 
+        // 댓글 목록 조회
         const selectCommentListSql = `SELECT notice_comment_tb.id AS "id",
             notice_comment_tb.content AS "content",
             TO_CHAR(notice_comment_tb.created_at, 'YYYY-MM-DD') AS "createdAt",
@@ -507,6 +514,7 @@ router.get("/:noticeId/comment/list", loginAuth, async (req, res, next) => {
         const selectCommentListParams = [noticeId]
         const selectCommentResult = await pgClient.query(selectCommentListSql,selectCommentListParams)
         
+        // 각 댓글이 작성자인지 체크
         const selectCommentData = selectCommentResult.rows
         selectCommentData.forEach( elem => elem.authorState = (elem.authorId == userId ? true : false))
         
