@@ -2,11 +2,11 @@ const router = require("express").Router();
 const pool = require("../../config/database/postgresql");
 const loginAuth = require("../middleware/auth/loginAuth");
 const validate = require("../module/validation");
-const { NOTICE_POST_IMG_TB } = require("../module/constraint");
 const { CLUB } = require("../module/global");
 const { NOTICE } = require("../module/global")
 const { BadRequestException } = require("../module/customError");
 const res = require("express/lib/response");
+const { user } = require("pg/lib/defaults");
 
 // 동아리 공지 게시물 불러오는 api
 router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
@@ -201,12 +201,12 @@ router.put("/", loginAuth, async (req, res, next) => {
         if (selectPositionResult.rows[0] >= 2) throw new BadRequestException("공지 게시물을 수정할 권한이 없습니다")
 
         // 공지 게시물 수정
-        const putNoticeSql = `UPDATE notice_post_tb 
+        const updateNoticeSql = `UPDATE notice_post_tb 
             SET title = $1, content = $2, is_fixed = $3 
             WHERE id = $4`
-        const putNoticeParams = [ title, content, isFixed, noticeId ]
-        const putNoticeResult = await pgClient.query(putNoticeSql, putNoticeParams)
-        if (putNoticeResult.rowCount == 0) throw new BadRequestException("일치하는 공지 게시물이 없습니다")
+        const updateNoticeParams = [ title, content, isFixed, noticeId ]
+        const updateNoticeResult = await pgClient.query(updateNoticeSql, updateNoticeParams)
+        if (updateNoticeResult.rowCount == 0) throw new BadRequestException("일치하는 공지 게시물이 없습니다")
 
         // 이미지 삭제
         const deleteNoticeImgSql = `DELETE FROM notice_post_img_tb
@@ -304,8 +304,7 @@ router.get("/:noticeId", loginAuth, async (req, res, next) => {
     try {
         pgClient = await pool.connect()
         await pgClient.query("BEGIN")
-        const selectNoticeSql = `SELECT notice_post_tb.id AS "noticeId",
-                account_tb.id AS "authorId",
+        const selectNoticeSql = `SELECT account_tb.id AS "authorId",
                 account_tb.name AS "authorName",
                 account_tb.personal_color AS "authorPersonalColor",
                 ARRAY_AGG(notice_post_img_tb.post_img) AS "postImages",
@@ -316,8 +315,7 @@ router.get("/:noticeId", loginAuth, async (req, res, next) => {
             JOIN account_tb ON notice_post_tb.account_id = account_tb.id
             JOIN notice_post_img_tb ON notice_post_tb.id = notice_post_img_tb.post_id
             WHERE notice_post_tb.id = $1
-            GROUP BY "noticeId",
-            "authorId",
+            GROUP BY "authorId",
             "authorName",
             "authorPersonalColor",
             "title",
@@ -353,9 +351,7 @@ router.get("/:noticeId", loginAuth, async (req, res, next) => {
     }
 })
 
-
 // 공지 게시물 댓글 작성
-
 router.post("/comment", loginAuth, async (req, res, next) => {
     const { noticeId, content } = req.body
     const userId = req.decoded.id
@@ -369,6 +365,7 @@ router.post("/comment", loginAuth, async (req, res, next) => {
     try {
         validate(noticeId, "noticeId").checkInput().isNumber()
         validate(content, "content").checkInput().checkLength(1,NOTICE.MAX_COMMENT_CONTENT_LENGTH)
+
         pgClient = await pool.connect()
         await pgClient.query("BEGIN")
 
@@ -389,6 +386,131 @@ router.post("/comment", loginAuth, async (req, res, next) => {
             VALUES ($1, $2, $3)`
         const insertCommentparams = [ userId, noticeId, content ]
         await pgClient.query(insertCommentsql, insertCommentparams)
+
+        await pgClient.query("COMMIT")
+    } catch (error) {
+        if (pgClient) {
+            await pgClient.query("ROLLBACK")
+        }
+        next(error)
+    } finally {
+        if (pgClient) pgClient.release
+        res.send(result)
+    }
+})
+
+// 공지 게시물 댓글 수정
+router.put("/comment", loginAuth, async (req, res, next) => {
+    const { commentId, content } = req.body
+    const userId = req.decoded.id
+    const result = {
+        message: "",
+        data: {}
+    }
+
+    let pgClient = null
+
+    try {
+        validate(commentId, "commentId").checkInput().isNumber()
+        validate(content, "content").checkInput().checkLength(1,NOTICE.MAX_COMMENT_CONTENT_LENGTH)
+
+        pgClient = await pool.connect()
+        await pgClient.query("BEGIN")
+
+        const updateCommentSql = `UPDATE notice_comment_tb
+            SET content = $1
+            WHERE notice_comment_tb.id = $2 AND notice_comment_tb.account_id = $3`
+        const updateCommentParams = [content, commentId, userId]
+        const updateCommentResult = await pgClient.query(updateCommentSql,updateCommentParams)
+        
+        if (updateCommentResult.rowCount == 0) throw new BadRequestException ("수정 가능한 댓글이 없습니다")
+
+        await pgClient.query("COMMIT")
+    } catch (error) {
+        if (pgClient) {
+            await pgClient.query("ROLLBACK")
+        }
+        next(error)
+    } finally {
+        if (pgClient) pgClient.release
+        res.send(result)
+    }
+})
+
+// 공지 게시물 댓글 삭제
+router.delete("/comment", loginAuth, async (req, res, next) => {
+    const { commentId } = req.body
+    const userId = req.decoded.id
+    const result = {
+        message: "",
+        data: {}
+    }
+
+    let pgClient = null
+
+    try {
+        validate(commentId, "commentId").checkInput().isNumber()
+
+        pgClient = await pool.connect()
+        await pgClient.query("BEGIN")
+
+        const deleteCommentSql = `DELETE FROM notice_comment_tb
+            WHERE notice_comment_tb.id = $1 AND notice_comment_tb.account_id = $2`
+        const deleteCommentParams = [commentId, userId]
+        const deleteCommentResult = await pgClient.query(deleteCommentSql,deleteCommentParams)
+
+        if (deleteCommentResult.rowCount == 0) throw new BadRequestException("삭제 가능한 댓글이 없습니다")
+
+        await pgClient.query("COMMIT")
+    } catch (error) {
+        if (pgClient) {
+            await pgClient.query("ROLLBACK")
+        }
+        next(error)
+    } finally {
+        if (pgClient) pgClient.release
+        res.send(result)
+    }
+})
+
+// 공지 게시물 댓글 리스트 조회
+router.get("/:noticeId/comment/list", loginAuth, async (req, res, next) => {
+    const { noticeId } = req.params
+    const userId = req.decoded.id
+    const result = {
+        message: "",
+        data: {}
+    }
+
+    let pgClient = null
+
+    try {
+        validate(noticeId,"noticeId").checkInput().isNumber()
+
+        pgClient = await pool.connect()
+        await pgClient.query("BEGIN")
+
+        const selectCommentListSql = `SELECT notice_comment_tb.id AS "id",
+            notice_comment_tb.content AS "content",
+            TO_CHAR(notice_comment_tb.created_at, 'YYYY-MM-DD') AS "createdAt",
+            notice_comment_tb.account_id AS "authorId",
+            account_tb.name AS "authorName",
+            account_tb.personal_color AS "authorPersonalColor",
+            (
+                SELECT COUNT (1)
+                FILTER (WHERE notice_reply_tb.notice_comment_id = notice_comment_tb.id)
+                FROM notice_reply_tb
+            ) AS "replyCount"
+            FROM notice_comment_tb
+            JOIN account_tb ON notice_comment_tb.account_id = account_tb.id
+            WHERE notice_comment_tb.notice_post_id = $1`
+        const selectCommentListParams = [noticeId]
+        const selectCommentResult = await pgClient.query(selectCommentListSql,selectCommentListParams)
+        
+        const selectCommentData = selectCommentResult.rows
+        selectCommentData.forEach( elem => elem.authorState = (elem.authorId == userId ? true : false))
+        
+        result.data = selectCommentData
 
         await pgClient.query("COMMIT")
     } catch (error) {
