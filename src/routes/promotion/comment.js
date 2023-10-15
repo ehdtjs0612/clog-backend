@@ -2,7 +2,7 @@ const router = require("express").Router();
 const pool = require("../../../config/database/postgresql");
 const loginAuth = require("../../middleware/auth/loginAuth");
 const validate = require("../../module/validation");
-const { PROMOTION_COMMENT } = require("../../module/global");
+const { PROMOTION_COMMENT, POSITION } = require("../../module/global");
 const { BadRequestException } = require('../../module/customError');
 const CONSTRAINT = require("../../module/constraint");
 
@@ -64,9 +64,13 @@ router.get("/:promotionId/list", loginAuth, async (req, res, next) => {
                                         ) AS "authorMajor",
                                         (
                                             SELECT
-                                                club_member_tb.position
+                                                position_tb.name
                                             FROM
                                                 club_member_tb
+                                            JOIN
+                                                position_tb
+                                            ON
+                                                club_member_tb.position = position_tb.id
                                             WHERE
                                                 club_member_tb.account_id = account_tb.id
                                             AND
