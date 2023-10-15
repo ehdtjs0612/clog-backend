@@ -1,9 +1,9 @@
 const router = require("express").Router();
-const pool = require("../../config/database/postgresql");
-const loginAuth = require('../middleware/auth/loginAuth');
-const validate = require('../module/validation');
-const { PROMOTION, IMAGE, POSITION } = require("../module/global");
-const { BadRequestException } = require("../module/customError");
+const pool = require("../../../config/database/postgresql");
+const loginAuth = require('../../middleware/auth/loginAuth');
+const validate = require('../../module/validation');
+const { PROMOTION, IMAGE, POSITION } = require("../../module/global");
+const { BadRequestException } = require("../../module/customError");
 
 // 동아리 내 홍보 게시물 조회
 // 권한: 로그인한 사용자라면 다 가능

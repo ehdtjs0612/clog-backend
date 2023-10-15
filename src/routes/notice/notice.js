@@ -1,9 +1,9 @@
 const router = require("express").Router();
-const pool = require("../../config/database/postgresql");
-const loginAuth = require("../middleware/auth/loginAuth");
-const validate = require("../module/validation");
-const { CLUB } = require("../module/global");
-const { BadRequestException } = require("../module/customError");
+const pool = require("../../../config/database/postgresql");
+const loginAuth = require("../../middleware/auth/loginAuth");
+const validate = require("../../module/validation");
+const { CLUB, POST } = require("../../module/global");
+const { BadRequestException } = require("../../module/customError");
 
 // 동아리 공지 게시물 불러오는 api
 router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
@@ -18,7 +18,7 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
         validate(clubId, "clubId").checkInput().isNumber();
         validate(page, 'page').isNumber().isPositive();
 
-        const offset = (page - 1) * CLUB.MAX_POST_COUNT_PER_PAGE;
+        const offset = (page - 1) * POST.MAX_POST_COUNT_PER_PAGE;
         const selectNoticeAllCountSql = `SELECT
                                                 count(*)::int
                                           FROM

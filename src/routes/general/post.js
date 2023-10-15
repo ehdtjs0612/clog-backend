@@ -1,10 +1,10 @@
 const router = require("express").Router();
-const pool = require("../../config/database/postgresql");
-const loginAuth = require('../middleware/auth/loginAuth');
-const validate = require('../module/validation');
-const CONSTRAINT = require("../module/constraint");
-const { CLUB, POST, POSITION } = require('../module/global');
-const { BadRequestException } = require('../module/customError');
+const pool = require("../../../config/database/postgresql");
+const loginAuth = require('../../middleware/auth/loginAuth');
+const validate = require('../../module/validation');
+const CONSTRAINT = require("../../module/constraint");
+const { CLUB, POST, POSITION } = require('../../module/global');
+const { BadRequestException } = require('../../module/customError');
 
 // 동아리 내 전체 게시글을 가져오는 api
 router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
@@ -97,7 +97,7 @@ router.get("/list/board/:boardId", loginAuth, async (req, res, next) => {
 
     try {
         validate(boardId, "boardId").checkInput().isNumber();
-        const offset = (page - 1) * CLUB.MAX_POST_COUNT_PER_PAGE;
+        const offset = (page - 1) * POST.MAX_POST_COUNT_PER_PAGE;
 
         const selectPostOfBoardSql = `SELECT 
                                             club_post_tb.id, 
@@ -114,7 +114,7 @@ router.get("/list/board/:boardId", loginAuth, async (req, res, next) => {
                                             $2 
                                       LIMIT 
                                             $3`;
-        const selectPostOfBoardParam = [boardId, offset, CLUB.MAX_POST_COUNT_PER_PAGE];
+        const selectPostOfBoardParam = [boardId, offset, POST.MAX_POST_COUNT_PER_PAGE];
         const selectPostOfBoardData = await pool.query(selectPostOfBoardSql, selectPostOfBoardParam);
         if (selectPostOfBoardData.rowCount !== 0) {
             result.data = {
@@ -141,31 +141,31 @@ router.get("/:postId", loginAuth, async (req, res, next) => {
         validate(postId, "postId").checkInput().isNumber();
 
         const selectPostSql = `SELECT 
-                                        club_post_tb.account_id AS "authorId", 
-                                        major_tb.name AS "authorMajor", 
-                                        account_tb.name AS "authorName", 
-                                        account_tb.personal_color AS "authorPcolor", 
-                                        account_tb.entry_year AS "authorEntryYear", 
-                                        club_post_tb.title AS "postTitle", 
-                                        club_post_Tb.content AS "postContent", 
-                                        TO_CHAR(club_post_tb.created_at, 'yyyy.mm.dd') AS "createdAt",
-                                        club_post_tb.account_id = $2 AS "authorState",
-                                        ARRAY (
-                                            SELECT
-                                                concat(post_img),
-                                            FROM
-                                                post_img_tb
-                                            WHERE
-                                                post_id = $1
-                                        ) AS "postImgArray"
-                               FROM 
-                                        club_post_tb 
-                               JOIN 
-                                        account_tb ON club_post_tb.account_id = account_tb.id 
-                               JOIN 
-                                        major_tb ON account_tb.major = major_tb.id 
-                               WHERE 
-                                        club_post_tb.id = $1`;
+                                    club_post_tb.account_id AS "authorId", 
+                                    major_tb.name AS "authorMajor", 
+                                    account_tb.name AS "authorName", 
+                                    account_tb.personal_color AS "authorPcolor", 
+                                    account_tb.entry_year AS "authorEntryYear", 
+                                    club_post_tb.title AS "postTitle", 
+                                    club_post_tb.content AS "postContent", 
+                                    TO_CHAR(club_post_tb.created_at, 'yyyy.mm.dd') AS "createdAt",
+                                    club_post_tb.account_id = $2 AS "authorState",
+                                    ARRAY (
+                                        SELECT
+                                            concat(post_img)
+                                        FROM
+                                            post_img_tb
+                                        WHERE
+                                            post_id = $1
+                                    ) AS "postImgArray"
+                                FROM 
+                                    club_post_tb 
+                                JOIN 
+                                    account_tb ON club_post_tb.account_id = account_tb.id 
+                                JOIN 
+                                    major_tb ON account_tb.major = major_tb.id 
+                                WHERE 
+                                    club_post_tb.id = $1;`;
         const selectPostParam = [postId, userId];
         const selectPostData = await pool.query(selectPostSql, selectPostParam);
         if (selectPostData.rowCount !== 0) {
@@ -373,6 +373,10 @@ router.put("/", loginAuth, async (req, res, next) => {
 router.delete("/", loginAuth, async (req, res, next) => {
     const { postId } = req.body;
     const userId = req.decoded.id;
+    const result = {
+        message: "",
+        data: {}
+    };
 
     try {
         // 본인이 쓴 글이거나 position 0 or 1

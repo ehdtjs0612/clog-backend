@@ -1,10 +1,10 @@
 const router = require("express").Router();
-const pool = require('../../config/database/postgresql');
-const loginAuth = require('../middleware/auth/loginAuth');
-const { BadRequestException } = require('../module/customError');
-const { REPLY, POSITION } = require('../module/global');
-const CONSTRAINT = require("../module/constraint");
-const validate = require('../module/validation');
+const pool = require('../../../config/database/postgresql');
+const loginAuth = require('../../middleware/auth/loginAuth');
+const { BadRequestException } = require('../../module/customError');
+const { REPLY, POSITION } = require('../../module/global');
+const CONSTRAINT = require("../../module/constraint");
+const validate = require('../../module/validation');
 
 // 댓글의 답글 리스트를 조회
 // 권한: 해당 동아리에 가입되어있어야 함
@@ -182,7 +182,6 @@ router.post("/", loginAuth, async (req, res, next) => {
                                         club_comment_tb.id = $2`;
         const selectClubAuthParam = [userId, commentId];
         const selectClubAuthData = await pool.query(selectClubAuthSql, selectClubAuthParam);
-        console.log(selectClubAuthData.rows)
         if (selectClubAuthData.rowCount === 0) {
             throw new BadRequestException("해당하는 댓글이 존재하지 않습니다");
         }
