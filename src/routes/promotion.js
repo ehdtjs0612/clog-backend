@@ -69,7 +69,7 @@ router.get("/:promotionId", loginAuth, async (req, res, next) => {
 });
 
 // 홍보 게시물 작성
-// 권한: 동아리 운영진
+// 권한: 동아리 관리자
 router.post("/", loginAuth, async (req, res, next) => {
     const userId = req.decoded.id;
     const { clubId, title, content, images } = req.body;
@@ -126,6 +126,92 @@ router.post("/", loginAuth, async (req, res, next) => {
         result.data = {
             promotionId: insertPromotionData.rows[0].id
         }
+
+    } catch (error) {
+        if (pgClient) {
+            await pgClient.query("ROLLBACK");
+        }
+        return next(error);
+    } finally {
+        if (pgClient) {
+            pgClient.release();
+        }
+    }
+    res.send(result);
+});
+
+// 홍보물 수정 api
+// 권한: 동아리의 관리자
+router.put("/", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
+    const { promotionId, title, content, images } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    };
+    let pgClient = null;
+
+    try {
+        validate(promotionId, "promotionId").checkInput().isNumber();
+        validate(title, "title").checkInput().checkLength(1, PROMOTION.MAX_PROMOTION_TITLE_LENGTH);
+        validate(content, "content").checkInput().checkLength(1, PROMOTION.MAX_PROMOTION_CONTENT_LENGTH);
+        validate(images, "images").checkInput().checkLength(1, IMAGE.MAX_PROMOTION_COUNT);
+        pgClient = await pool.connect();
+        pgClient.query("BEGIN");
+        // 권한 체크
+        const selectAuthSql = `SELECT
+                                    (
+                                        SELECT
+                                            club_member_tb.position
+                                        FROM
+                                            club_member_tb
+                                        WHERE
+                                            club_member_tb.club_id = club_tb.id
+                                        AND
+                                            club_member_tb.account_id = $1
+                                    ) AS "position"
+                                FROM
+                                    promotion_tb
+                                JOIN
+                                    club_tb
+                                ON
+                                    promotion_tb.club_id = club_tb.id
+                                WHERE
+                                    promotion_tb.id = $2`;
+        const selectAuthParam = [userId, promotionId];
+        const selectAuthData = await pgClient.query(selectAuthSql, selectAuthParam);
+        if (selectAuthData.rowCount === 0) {
+            throw new BadRequestException("해당하는 홍보물이 존재하지 않습니다");
+        }
+        if (selectAuthData.rows[0].position >= POSITION.MANAGER) {
+            throw new BadRequestException("수정 권한이 없습니다");
+        }
+        // 수정 시작
+        // 1. 홍보글 수정
+        const updatePromotionSql = `UPDATE
+                                        promotion_tb
+                                    SET
+                                        title = $1, content = $2
+                                    WHERE
+                                        id = $3`;
+        const updatePromotionParam = [title, content, promotionId];
+        await pgClient.query(updatePromotionSql, updatePromotionParam);
+        // 2. 기존 이미지 삭제
+        const deletePromotionImgSql = `DELETE FROM
+                                            promotion_img_tb
+                                        WHERE
+                                            post_id = $1`;
+        const deletePromotionImgParam = [promotionId];
+        await pgClient.query(deletePromotionImgSql, deletePromotionImgParam);
+        // 3. 수정된 이미지 삽입
+        const insertPromotionImgSql = `INSERT INTO
+                                                promotion_img_tb (post_id, post_img)
+                                            SELECT
+                                                $1, UNNEST($2::VARCHAR[])`;
+        const insertPromotionImgParam = [promotionId, images];
+        await pgClient.query(insertPromotionImgSql, insertPromotionImgParam);
+        await pgClient.query("COMMIT");
+        // 수정 종료
 
     } catch (error) {
         if (pgClient) {
