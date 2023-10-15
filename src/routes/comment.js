@@ -76,6 +76,20 @@ router.get("/list/post/:postId", loginAuth, async (req, res, next) => {
                                         )::int AS "replyCount",
                                         account_tb.id AS "authorId", 
                                         account_tb.name AS "authorName",
+                                        (
+                                            SELECT
+                                                position_tb.name
+                                            FROM
+                                                club_member_tb
+                                            JOIN
+                                                position_tb
+                                            ON
+                                                club_member_tb.position = position_tb.id
+                                            WHERE
+                                                club_member_tb.account_id = account_tb.id
+                                            AND
+                                                club_member_tb.club_id = club_tb.id
+                                        ) AS "authorPosition",
                                         account_tb.personal_color AS "authorPcolor", 
                                         club_post_tb.account_id = $1 AS "authorState" 
                                     FROM 
@@ -88,6 +102,14 @@ router.get("/list/post/:postId", loginAuth, async (req, res, next) => {
                                         club_post_tb 
                                     ON 
                                         club_comment_tb.club_post_id = club_post_tb.id 
+                                    JOIN
+                                        club_board_tb
+                                    ON
+                                        club_post_tb.club_board_id = club_board_tb.id
+                                    JOIN
+                                        club_tb
+                                    ON
+                                        club_board_tb.club_id = club_tb.id
                                     WHERE 
                                         club_comment_tb.club_post_id = $2
                                     ORDER BY
