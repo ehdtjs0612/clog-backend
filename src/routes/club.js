@@ -100,7 +100,17 @@ router.get("/:clubId/profile", loginAuth, authCheck(POSITION.MEMBER), async (req
                                         big_category_tb.name AS "bigCategory", 
                                         small_category_tb.name AS "smallCategory", 
                                         club_tb.profile_img AS "profileImage", 
+                                        club_tb.banner_img AS "bannerImage",
                                         club_tb.cover AS "cover", 
+                                        club_tb.theme_color AS "themeColor",
+                                        (
+                                            SELECT
+                                                COUNT(*)
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.club_id = club_tb.id
+                                        ) AS "memberCount",
                                         club_tb.created_at AS "createdAt"
                                  FROM 
                                         club_tb
