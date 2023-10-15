@@ -4,6 +4,7 @@ const loginAuth = require('../../middleware/auth/loginAuth');
 const validate = require('../../module/validation');
 const { PROMOTION, IMAGE, POSITION } = require("../../module/global");
 const { BadRequestException } = require("../../module/customError");
+const CONSTRAINT = require("../../module/constraint");
 
 // 동아리 내 홍보 게시물 조회
 // 권한: 로그인한 사용자라면 다 가능
@@ -130,6 +131,9 @@ router.post("/", loginAuth, async (req, res, next) => {
     } catch (error) {
         if (pgClient) {
             await pgClient.query("ROLLBACK");
+        }
+        if (error.constraint === CONSTRAINT.FK_CLUB_TO_PROMOTION_POST_TB) {
+            return next(new BadRequestException("해당하는 동아리가 존재하지 않습니다"));
         }
         return next(error);
     } finally {
