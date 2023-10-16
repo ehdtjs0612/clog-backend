@@ -320,7 +320,7 @@ router.put("/", loginAuth, async (req, res, next) => {
             return next(new BadRequestException("게시글이 존재하지 않습니다."));
         }
 
-        if (selectPositionResult.rows[0].accountId !== userId && selectPositionResult.rows[0].position >= POSITION.MANAGER) {
+        if (selectPositionResult.rows[0].accountId !== userId && selectPositionResult.rows[0].position > POSITION.MANAGER) {
             return next(new BadRequestException("수정 권한이 존재하지 않습니다."));
         }
 
@@ -355,7 +355,7 @@ router.put("/", loginAuth, async (req, res, next) => {
         if (pgClient) {
             await pgClient.query("ROLLBACK");
         }
-        if (error.constraint === CONSTRAINT.FK_CLUB_POST_TO_IMG_TB) {
+        if (error.constraint === CONSTRAINT.FK_POST_TO_POST_IMG_TB) {
             return next(new BadRequestException("해당하는 게시글이 존재하지 않습니다"));
         }
         return next(error);
@@ -409,7 +409,7 @@ router.delete("/", loginAuth, async (req, res, next) => {
         if (selectAuthorData.rowCount === 0) {
             throw new BadRequestException("해당하는 게시글이 존재하지 않습니다");
         }
-        if (selectAuthorData.rows[0].accountId !== userId && selectAuthorData.rows[0].position >= POSITION.MANAGER) {
+        if (selectAuthorData.rows[0].accountId !== userId && selectAuthorData.rows[0].position > POSITION.MANAGER) {
             throw new BadRequestException("삭제 권한이 존재하지 않습니다");
         }
 

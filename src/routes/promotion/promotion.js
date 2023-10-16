@@ -100,7 +100,7 @@ router.post("/", loginAuth, async (req, res, next) => {
         if (selectAuthData.rowCount === 0) {
             throw new BadRequestException("해당하는 동아리가 존재하지 않습니다");
         }
-        if (selectAuthData.rows[0].position >= POSITION.MANAGER) {
+        if (selectAuthData.rows[0].position > POSITION.MANAGER) {
             throw new BadRequestException("홍보글 작성 권한이 없습니다");
         }
 
@@ -187,7 +187,7 @@ router.put("/", loginAuth, async (req, res, next) => {
         if (selectAuthData.rowCount === 0) {
             throw new BadRequestException("해당하는 홍보물이 존재하지 않습니다");
         }
-        if (selectAuthData.rows[0].position >= POSITION.MANAGER) {
+        if (selectAuthData.rows[0].position > POSITION.MANAGER) {
             throw new BadRequestException("수정 권한이 없습니다");
         }
         // 수정 시작
@@ -268,7 +268,7 @@ router.delete("/", loginAuth, async (req, res, next) => {
         if (selectAuthData.rowCount === 0) {
             throw new BadRequestException("해당하는 홍보물이 존재하지 않습니다");
         }
-        if (selectAuthData.rows[0].position >= POSITION.MANAGER) {
+        if (selectAuthData.rows[0].position > POSITION.MANAGER) {
             throw new BadRequestException("삭제 권한이 없습니다");
         }
         // 삭제 시작
