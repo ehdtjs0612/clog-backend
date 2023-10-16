@@ -202,4 +202,65 @@ router.put("/", loginAuth, async (req, res, next) => {
     res.send(result);
 });
 
+// 홍보 게시물의 댓글 삭제 api
+// 권한: 해당 동아리의 관리자
+router.delete("/", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
+    const { commentId } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(commentId, "commentId").checkInput().isNumber();
+        // 권한 체크
+        const selectAuthSql = `SELECT
+                                    (
+                                        SELECT
+                                            club_member_tb.position
+                                        FROM
+                                            club_member_Tb
+                                        WHERE
+                                            club_member_tb.account_id = $1
+                                        AND
+                                            club_member_tb.club_id = club_tb.id
+                                    ) AS "position"
+                                FROM
+                                    promotion_comment_tb
+                                JOIN
+                                    promotion_tb
+                                ON
+                                    promotion_comment_tb.post_id = promotion_tb.id
+                                JOIN
+                                    club_tb
+                                ON
+                                    promotion_tb.club_id = club_tb.id
+                                WHERE
+                                    promotion_comment_tb.id = $2`;
+        const selectAuthParam = [userId, commentId];
+        const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
+        if (selectAuthData.rowCount === 0) {
+            throw new BadRequestException("해당하는 댓글이 존재하지 않습니다");
+        }
+        if (selectAuthData.rows[0].position === null || selectAuthData.rows[0].position > POSITION.MEMBER) {
+            throw new BadRequestException("삭제 권한이 없습니다")
+        }
+        // 삭제 시작
+        const deleteCommentSql = `DELETE FROM
+                                            promotion_comment_tb
+                                        WHERE
+                                            id = $1`;
+        const deleteCommentParam = [commentId];
+        const deleteCommentData = await pool.query(deleteCommentSql, deleteCommentParam);
+        if (deleteCommentData.rowCount === 0) {
+            throw new BadRequestException("해당하는 댓글이 존재하지 않습니다");
+        }
+
+    } catch (error) {
+        return next(error);
+    }
+    res.send(result);
+});
+
 module.exports = router;
