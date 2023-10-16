@@ -85,4 +85,8 @@ module.exports = {
         MAX_CONTENT_LENGTH: 500,
         MAX_COMMENT_CONTENT_LENGTH: 300,
     },
+
+    NOTICE_COMMENT: {
+        MAX_COMMENT_COUNT_PER_POST : 10 // 임시
+    }
 }
