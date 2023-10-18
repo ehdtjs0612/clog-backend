@@ -18,7 +18,7 @@ router.post("/", loginAuth, async (req, res, next) => {
 
     try {
         validate(noticeId, "noticeId").checkInput().isNumber()
-        validate(content, "content").checkInput().checkLength(1,NOTICE.MAX_COMMENT_CONTENT_LENGTH)
+        validate(content, "content").checkInput().checkLength(1, NOTICE.MAX_COMMENT_CONTENT_LENGTH)
 
         pgClient = await pool.connect()
         await pgClient.query("BEGIN")
@@ -32,15 +32,15 @@ router.post("/", loginAuth, async (req, res, next) => {
                 FROM notice_post_tb
                 WHERE notice_post_tb.id = $2 
             )`
-        const selectPositionParams = [ userId, noticeId ]
+        const selectPositionParams = [userId, noticeId]
         const selectPositionResult = await pgClient.query(selectPositionSql, selectPositionParams)
-        
-        if (selectPositionResult.rowCount == 0) throw new BadRequestException ("해당 동아리의 부원이 아닙니다")
+
+        if (selectPositionResult.rowCount == 0) throw new BadRequestException("해당 동아리의 부원이 아닙니다")
 
         // 공지 댓글 작성
         const insertCommentsql = `INSERT INTO notice_comment_tb (account_id, notice_post_id, content) 
             VALUES ($1, $2, $3)`
-        const insertCommentparams = [ userId, noticeId, content ]
+        const insertCommentparams = [userId, noticeId, content]
         await pgClient.query(insertCommentsql, insertCommentparams)
 
         await pgClient.query("COMMIT")
@@ -48,7 +48,7 @@ router.post("/", loginAuth, async (req, res, next) => {
         if (pgClient) {
             await pgClient.query("ROLLBACK")
         }
-        next(error)
+        return next(error)
     } finally {
         if (pgClient) pgClient.release
     }
@@ -68,7 +68,7 @@ router.put("/", loginAuth, async (req, res, next) => {
 
     try {
         validate(commentId, "commentId").checkInput().isNumber()
-        validate(content, "content").checkInput().checkLength(1,NOTICE.MAX_COMMENT_CONTENT_LENGTH)
+        validate(content, "content").checkInput().checkLength(1, NOTICE.MAX_COMMENT_CONTENT_LENGTH)
 
         pgClient = await pool.connect()
         await pgClient.query("BEGIN")
@@ -78,17 +78,17 @@ router.put("/", loginAuth, async (req, res, next) => {
             SET content = $1
             WHERE notice_comment_tb.id = $2 AND notice_comment_tb.account_id = $3`
         const updateCommentParams = [content, commentId, userId]
-        const updateCommentResult = await pgClient.query(updateCommentSql,updateCommentParams)
-        
+        const updateCommentResult = await pgClient.query(updateCommentSql, updateCommentParams)
+
         // 댓글이 없거나, 내가 작성한 댓글이 아닌 경우
-        if (updateCommentResult.rowCount == 0) throw new BadRequestException ("수정 가능한 댓글이 없습니다")
+        if (updateCommentResult.rowCount == 0) throw new BadRequestException("수정 가능한 댓글이 없습니다")
 
         await pgClient.query("COMMIT")
     } catch (error) {
         if (pgClient) {
             await pgClient.query("ROLLBACK")
         }
-        next(error)
+        return next(error)
     } finally {
         if (pgClient) pgClient.release
     }
@@ -116,7 +116,7 @@ router.delete("/", loginAuth, async (req, res, next) => {
         const deleteCommentSql = `DELETE FROM notice_comment_tb
             WHERE notice_comment_tb.id = $1 AND notice_comment_tb.account_id = $2`
         const deleteCommentParams = [commentId, userId]
-        const deleteCommentResult = await pgClient.query(deleteCommentSql,deleteCommentParams)
+        const deleteCommentResult = await pgClient.query(deleteCommentSql, deleteCommentParams)
 
         // 댓글이 없거나 내가 작성한 댓글이 아닌 경우
         if (deleteCommentResult.rowCount == 0) throw new BadRequestException("삭제 가능한 댓글이 없습니다")
@@ -126,7 +126,7 @@ router.delete("/", loginAuth, async (req, res, next) => {
         if (pgClient) {
             await pgClient.query("ROLLBACK")
         }
-        next(error)
+        return next(error)
     } finally {
         if (pgClient) pgClient.release
     }
@@ -146,7 +146,7 @@ router.get("/:noticeId/list", loginAuth, async (req, res, next) => {
     let pgClient = null
 
     try {
-        validate(noticeId,"noticeId").checkInput().isNumber()
+        validate(noticeId, "noticeId").checkInput().isNumber()
 
         pgClient = await pool.connect()
         await pgClient.query("BEGIN")
@@ -180,8 +180,8 @@ router.get("/:noticeId/list", loginAuth, async (req, res, next) => {
             LIMIT $3
             OFFSET $4`
         const selectCommentListParams = [userId, noticeId, NOTICE_COMMENT.MAX_COMMENT_COUNT_PER_POST, NOTICE_COMMENT.MAX_COMMENT_COUNT_PER_POST * (page - 1)]
-        await pgClient.query(selectCommentListSql,selectCommentListParams)
-        
+        await pgClient.query(selectCommentListSql, selectCommentListParams)
+
         result.data = selectCommentData
 
         await pgClient.query("COMMIT")
@@ -189,7 +189,7 @@ router.get("/:noticeId/list", loginAuth, async (req, res, next) => {
         if (pgClient) {
             await pgClient.query("ROLLBACK")
         }
-        next(error)
+        return next(error)
     } finally {
         if (pgClient) pgClient.release
     }
