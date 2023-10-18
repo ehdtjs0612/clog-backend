@@ -135,7 +135,19 @@ const createNotification = async (url, key) => {
     console.log(selectedData.rows)
     conn = await client.connect(process.env.MONGODB_URL)
 
-    if (selectedData.rowCount != 0) await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).insertMany(selectedData.rows, { ignoreUndefined: true })
+    // 몽고디비에 저장
+    const insertNotificationResult = await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).insertMany(selectedData.rows, { ignoreUndefined: true })
+
+    for (let index = 0; index < selectedData.rowCount; index++) {
+        const userFilter = { user_id: selectedData.rows[index].user_id }
+        const pipeLine = [
+            { $match: userFilter },
+            { $count: "count" }
+        ]
+        const notificationCountResult = await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).aggregate(pipeLine).toArray()
+        console.log(notificationCountResult)
+    }
+
 
     // 답글 알림의 경우 댓글 알림으로 바꿔서 한번 더 실행
     if (type == "club_reply") {
@@ -153,6 +165,6 @@ const createNotification = async (url, key) => {
     await conn.close()
 }
 
-createNotification(notificationUrl.clubComment, 2)
+createNotification(notificationUrl.notiComment, 2)
 
 module.exports = createNotification 

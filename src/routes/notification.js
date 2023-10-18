@@ -22,8 +22,7 @@ router.get("/list", loginAuth, async (req, res, next) => {
         conn = await client.connect(process.env.MONGODB_URL)
 
         const filter = { user_id: userId }
-        const sort = { _id: -1 }
-        const data = await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).find(filter).sort(sort).limit(notification.limit).toArray()
+        const data = await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).find(filter).limit(notification.limit).toArray()
         result.data = notificationSentence(data)
         result.message = "알림 목록 조회 성공"
 
