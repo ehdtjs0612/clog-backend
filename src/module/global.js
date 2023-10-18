@@ -78,5 +78,15 @@ module.exports = {
     notification: {
         idLength: 24,
         limit: 5
+    },
+
+    NOTICE: {
+        MAX_TITLE_LENGTH: 20,
+        MAX_CONTENT_LENGTH: 500,
+        MAX_COMMENT_CONTENT_LENGTH: 300,
+    },
+
+    NOTICE_COMMENT: {
+        MAX_COMMENT_COUNT_PER_POST : 10 // 임시
     }
 }

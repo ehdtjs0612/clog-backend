@@ -103,9 +103,9 @@ const createNotification = async (url, key) => {
         case notificationUrl.gradeUpdate:
             type = "grade_update"
             sql = `SELECT club_member_tb.account_id AS "user_id",
-            club_member_tb.position AS "position",
-            club_tb.name AS "club_name",
-            club_tb.id AS "club_id"
+                club_member_tb.position AS "position",
+                club_tb.name AS "club_name",
+                club_tb.id AS "club_id"
             FROM club_member_tb
             JOIN club_tb ON club_member_tb.club_id = club_tb.id
             WHERE club_member_tb.id = $1`
@@ -114,8 +114,8 @@ const createNotification = async (url, key) => {
         case notificationUrl.joinAccept:
             type = "join_accept"
             sql = `SELECT club_member_tb.account_id AS "user_id",
-            club_tb.name AS "club_name",
-            club_tb.id AS "club_id"
+                club_tb.name AS "club_name",
+                club_tb.id AS "club_id"
             FROM club_member_tb
             JOIN club_tb ON club_member_tb.club_id = club_tb.id
             WHERE club_member_tb.id = $1`
@@ -135,7 +135,9 @@ const createNotification = async (url, key) => {
     console.log(selectedData.rows)
     conn = await client.connect(process.env.MONGODB_URL)
 
-    if (selectedData.rowCount != 0) await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).insertMany(selectedData.rows, { ignoreUndefined: true })
+    // 몽고디비에 저장
+    await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).insertMany(selectedData.rows, { ignoreUndefined: true })
+
 
     // 답글 알림의 경우 댓글 알림으로 바꿔서 한번 더 실행
     if (type == "club_reply") {
@@ -152,7 +154,5 @@ const createNotification = async (url, key) => {
 
     await conn.close()
 }
-
-createNotification(notificationUrl.clubComment, 2)
 
 module.exports = createNotification 

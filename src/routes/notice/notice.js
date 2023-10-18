@@ -2,7 +2,7 @@ const router = require("express").Router();
 const pool = require("../../../config/database/postgresql");
 const loginAuth = require("../../middleware/auth/loginAuth");
 const validate = require("../../module/validation");
-const { CLUB, POST } = require("../../module/global");
+const { CLUB, POST, NOTICE } = require("../../module/global");
 const { BadRequestException } = require("../../module/customError");
 
 // 동아리 공지 게시물 불러오는 api
@@ -106,4 +106,249 @@ router.get("/fixed/club/:clubId", loginAuth, async (req, res, next) => {
     res.send(result);
 });
 
-module.exports = router;
+// 공지 게시물 작성
+router.post("/", loginAuth, async (req, res, next) => {
+    const { clubId, title, content, images, isFixed } = req.body
+    const userId = req.decoded.id
+    const result = {
+        message: "",
+        data: {}
+    }
+
+    let pgClient = null
+
+    try {
+        validate(clubId,"clubId").checkInput().isNumber()
+        validate(title, "title").checkInput().checkLength(1,NOTICE.MAX_TITLE_LENGTH)
+        validate(content, "content").checkInput().checkLength(1,NOTICE.MAX_CONTENT_LENGTH)
+        validate(isFixed, "isFixed").checkInput().isBoolean()
+
+        pgClient = await pool.connect()
+        await pgClient.query("BEGIN")
+
+        // 작성 권한 체크 (해당 동아리 운영진)
+        const selectPositionSql = `SELECT position
+            FROM club_member_tb
+            WHERE club_id = $1 AND account_id = $2`
+        const selectPositionParams = [ clubId, userId ]
+        const selectPositionResult = await pgClient.query(selectPositionSql, selectPositionParams)
+
+        if (selectPositionResult.rowCount == 0) throw new BadRequestException("해당 동아리 부원이 아닙니다")
+        if (selectPositionResult.rows[0] >= 2) throw new BadRequestException("공지 게시물을 작성할 권한이 없습니다")
+
+        // 공지 게시물 작성
+        const postNoticeSql = `INSERT INTO notice_post_tb (account_id, club_id, title, content, is_fixed) 
+            VALUES ($1, $2, $3, $4, $5) 
+            RETURNING id AS "postId"`
+
+        const postNoticeParams = [ userId, clubId, title, content, isFixed ]
+        const postNoticeResult = await pgClient.query(postNoticeSql, postNoticeParams)
+        const postId = postNoticeResult.rows[0].postId
+
+        // 이미지 저장
+        const postNoticeImgSql = `INSERT INTO notice_post_img_tb (post_id, post_img) 
+            VALUES ($1, UNNEST($2::VARCHAR[]))`
+        const postNoticeImgParams = [ postId, images ]
+        await pgClient.query(postNoticeImgSql, postNoticeImgParams)
+        await pgClient.query("COMMIT")
+    } catch (error) {
+        if (pgClient) {
+            await pgClient.query("ROLLBACK")
+        }
+        next(error)
+    } finally {
+        if (pgClient) pgClient.release
+    }
+    res.send(result)
+})
+
+// 공지 게시물 수정
+router.put("/", loginAuth, async (req, res, next) => {
+    const { noticeId, title, content, images, isFixed } = req.body
+    const userId = req.decoded.id
+    const result = {
+        message: "",
+        data: {}
+    }
+
+    let pgClient = null
+
+    try {
+        validate(noticeId, "noticeId").checkInput().isNumber()
+        validate(title, "title").checkInput().checkLength(1,NOTICE.MAX_TITLE_LENGTH)
+        validate(content, "content").checkInput().checkLength(1,NOTICE.MAX_CONTENT_LENGTH)
+        validate(isFixed, "isFixed").checkInput().isBoolean()
+
+        pgClient = await pool.connect()
+        await pgClient.query("BEGIN")
+
+        // 수정 권한 체크 (해당 동아리 운영진)
+        const selectPositionSql = `SELECT position
+            FROM club_member_tb
+            WHERE account_id = $1
+            AND club_id = (
+                SELECT notice_post_tb.club_id
+                FROM notice_post_tb
+                WHERE notice_post_tb.id = $2 
+            )`
+        const selectPositionParams = [ userId, noticeId ]
+        const selectPositionResult = await pgClient.query(selectPositionSql, selectPositionParams)
+
+        if (selectPositionResult.rowCount == 0) throw new BadRequestException("해당 동아리 부원이 아닙니다")
+        if (selectPositionResult.rows[0] >= 2) throw new BadRequestException("공지 게시물을 수정할 권한이 없습니다")
+
+        // 공지 게시물 수정
+        const updateNoticeSql = `UPDATE notice_post_tb 
+            SET title = $1, content = $2, is_fixed = $3 
+            WHERE id = $4`
+        const updateNoticeParams = [ title, content, isFixed, noticeId ]
+        const updateNoticeResult = await pgClient.query(updateNoticeSql, updateNoticeParams)
+        if (updateNoticeResult.rowCount == 0) throw new BadRequestException("일치하는 공지 게시물이 없습니다")
+
+        // 이미지 삭제
+        const deleteNoticeImgSql = `DELETE FROM notice_post_img_tb
+            WHERE post_id = $1`
+        const deleteNoticeImgParams = [noticeId]
+        await pgClient.query(deleteNoticeImgSql, deleteNoticeImgParams)
+
+        // 이미지 저장
+        const insertNoticeImgSql = `INSERT INTO notice_post_img_tb (post_id, post_img) 
+            VALUES ($1,UNNEST($2::VARCHAR[]))`
+        const insertNoticeImgParams = [noticeId, images]
+        await pgClient.query(insertNoticeImgSql, insertNoticeImgParams)
+
+        await pgClient.query("COMMIT")
+    } catch (error) {
+        if (pgClient) {
+            await pgClient.query("ROLLBACK")
+        }
+        next(error)
+    } finally {
+        if (pgClient) pgClient.release
+    }
+    res.send(result)
+})
+
+// 공지 게시물 삭제
+router.delete("/", loginAuth, async (req, res, next) => {
+    const { noticeId } = req.body
+    const userId = req.decoded.id
+    const result = {
+        message: "",
+        data: {}
+    }
+
+    let pgClient = null
+
+    try {
+        validate(noticeId, "noticeId").checkInput().isNumber()
+
+        pgClient = await pool.connect()
+        await pgClient.query("BEGIN")
+
+        // 삭제 권한 체크
+        const selectPositionSql = `SELECT position
+            FROM club_member_tb
+            WHERE account_id = $1
+            AND club_id = (
+                SELECT notice_post_tb.club_id
+                FROM notice_post_tb
+                WHERE notice_post_tb.id = $2 
+            )`
+        const selectPositionParams = [ userId, noticeId ]
+        const selectPositionResult = await pgClient.query(selectPositionSql, selectPositionParams)
+
+        if (selectPositionResult.rowCount == 0) throw new BadRequestException("해당 동아리 부원이 아닙니다")
+        if (selectPositionResult.rows[0] >= 2) throw new BadRequestException("공지 게시물을 삭제할 권한이 없습니다")
+
+        // 공지 게시물 삭제
+        const deleteNoticeSql = `DELETE FROM notice_post_tb 
+            WHERE id = $2`
+        const deleteNoticeParams = [ noticeId ]
+        const deleteNoticeResult = await pgClient.query(deleteNoticeSql, deleteNoticeParams)
+
+        if (deleteNoticeResult == 0) throw new BadRequestException("일치하는 공지 게시물이 없습니다")
+
+        // 이미지 삭제
+        const deleteNoticeImgSql = `DELETE FROM notice_post_img_tb
+            WHERE post_id = $1`
+        const deleteNoticeImgParams = [ noticeId ]
+        await pgClient.query(deleteNoticeImgSql, deleteNoticeImgParams)
+
+        await pgClient.query("COMMIT")
+    } catch (error) {
+        if (pgClient) {
+            await pgClient.query("ROLLBACK")
+        }
+        next(error)
+    } finally {
+        if (pgClient) pgClient.release
+    }
+    res.send(result)
+})
+
+// 공지 게시물 조회
+router.get("/:noticeId", loginAuth, async (req, res, next) => {
+    const { noticeId } = req.params
+    const userId = req.decoded.id
+    const result = {
+        message: "",
+        data: {}
+    }
+
+    let pgClient = null
+
+    try {
+        pgClient = await pool.connect()
+        await pgClient.query("BEGIN")
+
+        // 게시물 조회
+        const selectNoticeSql = `SELECT account_tb.id AS "authorId",
+                account_tb.name AS "authorName",
+                account_tb.personal_color AS "authorPersonalColor",
+                ARRAY_AGG(notice_post_img_tb.post_img) AS "postImages",
+                notice_post_tb.title AS "title",
+                notice_post_tb.content AS "content",
+                TO_CHAR(notice_post_tb.created_at, 'yyyy.mm.dd') AS "createdAt"
+            FROM notice_post_tb
+            JOIN account_tb ON notice_post_tb.account_id = account_tb.id
+            JOIN notice_post_img_tb ON notice_post_tb.id = notice_post_img_tb.post_id
+            WHERE notice_post_tb.id = $1
+            GROUP BY "authorId",
+            "authorName",
+            "authorPersonalColor",
+            "title",
+            "content",
+            "createdAt"`
+        const selectNoticeParams = [noticeId]
+        const selectNoticeResult = await pgClient.query(selectNoticeSql,selectNoticeParams)
+
+        result.data = selectNoticeResult.rows[0]
+
+        // 직급 체크
+        const selectPositionSql = `SELECT position
+            FROM club_member_tb
+            WHERE account_id = $1
+            AND club_id = (
+                SELECT notice_post_tb.club_id
+                FROM notice_post_tb
+                WHERE notice_post_tb.id = $2 
+            )`
+        const selectPositionParams = [ userId, noticeId ]
+        const selectPositionResult = await pgClient.query(selectPositionSql, selectPositionParams)
+
+        result.data.managerState = ( selectNoticeResult.rows[0] >= 2 ? false : true )
+
+        await pgClient.query("COMMIT")
+    } catch (error) {
+        if (pgClient) {
+            await pgClient.query("ROLLBACK")
+        }
+        next(error)
+    } finally {
+        if (pgClient) pgClient.release
+    }
+    res.send(result)
+})
+
+module.exports = router
