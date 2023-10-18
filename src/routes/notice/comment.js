@@ -158,23 +158,29 @@ router.get("/:noticeId/list", loginAuth, async (req, res, next) => {
             notice_comment_tb.account_id AS "authorId",
             account_tb.name AS "authorName",
             account_tb.personal_color AS "authorPersonalColor",
+            COALESCE(
+                (
+                    SELECT club_member_tb.position < 2
+                    FROM club_member_tb
+                    WHERE club_member_tb.club_id = club_tb.id
+                    AND club_member_tb.account_id = $1
+                ), false
+            ) AS "manageState",
             (
-                SELECT COUNT (1)
+                SELECT COUNT (1)::int
                 FILTER (WHERE notice_reply_tb.notice_comment_id = notice_comment_tb.id)
                 FROM notice_reply_tb
-            ) AS "replyCount"
+            )::int AS "replyCount"
             FROM notice_comment_tb
             JOIN account_tb ON notice_comment_tb.account_id = account_tb.id
-            WHERE notice_comment_tb.notice_post_id = $1
+            JOIN notice_post_tb ON notice_comment_tb.notice_post_id = notice_post_tb.id
+            JOIN club_tb ON notice_post_tb.club_id = club_tb.id
+            WHERE notice_comment_tb.notice_post_id = $2
             ORDER BY "createdAt" DESC
-            LIMIT $2
-            OFFSET $3`
-        const selectCommentListParams = [noticeId, NOTICE_COMMENT.MAX_COMMENT_COUNT_PER_POST, NOTICE_COMMENT.MAX_COMMENT_COUNT_PER_POST * (page - 1)]
-        const selectCommentResult = await pgClient.query(selectCommentListSql,selectCommentListParams)
-        
-        // 각 댓글이 작성자인지 체크
-        const selectCommentData = selectCommentResult.rows
-        selectCommentData.forEach( elem => elem.authorState = (elem.authorId == userId ? true : false))
+            LIMIT $3
+            OFFSET $4`
+        const selectCommentListParams = [userId, noticeId, NOTICE_COMMENT.MAX_COMMENT_COUNT_PER_POST, NOTICE_COMMENT.MAX_COMMENT_COUNT_PER_POST * (page - 1)]
+        await pgClient.query(selectCommentListSql,selectCommentListParams)
         
         result.data = selectCommentData
 
