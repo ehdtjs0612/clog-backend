@@ -3,6 +3,8 @@ const loginAuth = require('../../middleware/auth/loginAuth');
 const { REPLY } = require('../../module/global');
 const validate = require('../../module/validation');
 const pool = require("../../../config/database/postgresql");
+const CONSTRAINT = require("../../module/constraint");
+const { BadRequestException } = require('../../module/customError');
 
 
 // 홍보 게시물 댓글의 답글 리스트 조회
@@ -21,6 +23,7 @@ router.get("/list/comment/:commentId", loginAuth, async (req, res, next) => {
         validate(commentId, "commentId").checkInput().isNumber();
         validate(page, "page").isNumber().isPositive();
 
+        // manageState 권한은 답글의 작성자이거나 해당 동아리의 관리자여야함
         const selectReplySql = `SELECT
                                         promotion_reply_tb.id,
                                         promotion_reply_tb.content,
@@ -37,17 +40,16 @@ router.get("/list/comment/:commentId", loginAuth, async (req, res, next) => {
                                                 account_tb.major = major_tb.id
                                         ) AS "authorMajor",
                                         account_tb.personal_color AS "authorPcolor",
-                                        COALESCE(
-                                            (
-                                                SELECT
-                                                    club_member_tb.position < 2
-                                                FROM
-                                                    club_member_tb
-                                                WHERE
-                                                    club_member_tb.club_id = club_tb.id
-                                                AND
-                                                    club_member_tb.account_id = $1
-                                            ), false) AS "manageState"
+                                    CASE
+                                        WHEN 
+                                            promotion_reply_tb.account_id = $1 
+                                        OR 
+                                            club_member_tb.position < 2 
+                                        THEN 
+                                            true
+                                        ELSE 
+                                            false
+                                        END AS "manageState"
                                     FROM
                                         promotion_reply_tb
                                     JOIN
@@ -66,15 +68,19 @@ router.get("/list/comment/:commentId", loginAuth, async (req, res, next) => {
                                         club_tb
                                     ON
                                         promotion_tb.club_id = club_tb.id
+                                    LEFT JOIN
+                                        club_member_tb
+                                    ON
+                                        club_member_tb.account_id = $2
                                     WHERE
-                                        promotion_reply_tb.comment_id = $2
+                                        promotion_reply_tb.comment_id = $3
                                     ORDER BY
                                         promotion_reply_tb.created_at DESC
                                     OFFSET
-                                        $3
+                                        $4
                                     LIMIT
-                                        $4`;
-        const selectReplyParam = [userId, commentId, offset, REPLY.MAX_REPLY_COUNT_PER_COMMENT]
+                                        $5`;
+        const selectReplyParam = [userId, userId, commentId, offset, REPLY.MAX_REPLY_COUNT_PER_COMMENT]
         const selectReplyData = await pool.query(selectReplySql, selectReplyParam);
         result.data = {
             message: selectReplyData.rows
