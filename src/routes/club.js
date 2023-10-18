@@ -459,7 +459,9 @@ router.post("/member", loginAuth, async (req, res, next) => {
 });
 
 // 동아리 가입 신청 거부 api
-router.delete("/join-request", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) => {
+// 권한: 해당 동아리의 관리자
+router.delete("/join-request", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
     const { requestId } = req.body;
     const result = {
         message: "",
@@ -469,6 +471,35 @@ router.delete("/join-request", loginAuth, authCheck(POSITION.MANAGER), async (re
     try {
         validate(requestId, "requestId").checkInput().isNumber();
 
+        // 권한 체크
+        const selectAuthSql = `SELECT
+                                    (
+                                        SELECT
+                                            club_member_tb.position
+                                        FROM
+                                            club_member_tb
+                                        WHERE
+                                            club_member_tb.account_id = $1
+                                        AND
+                                            club_member_tb.club_id = club_tb.id
+                                    ) AS "position"
+                                FROM
+                                    join_request_tb
+                                JOIN
+                                    club_tb
+                                ON
+                                    join_request_tb.club_id = club_tb.id
+                                WHERE
+                                    join_request_tb.id = $2`;
+        const selectAuthParam = [userId, requestId];
+        const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
+        if (selectAuthData.rowCount === 0) {
+            throw new BadRequestException("해당하는 가입 요청이 존재하지 않습니다");
+        }
+        if (selectAuthData.rows[0]?.position > POSITION.MANAGER) {
+            throw new BadRequestException("권한이 없습니다");
+        }
+        // 요청 삭제
         const deleteJoinRequestSql = `DELETE FROM join_request_tb WHERE id = $1`;
         const deleteJoinRequestParam = [requestId];
         const deleteJoinRequestData = await pool.query(deleteJoinRequestSql, deleteJoinRequestParam);
