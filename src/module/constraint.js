@@ -38,4 +38,6 @@ module.exports = {
     FK_ACCOUNT_TO_PROMOTION_COMMENT_TB: "fk_account_tb_to_promotion_comment_tb",
     FK_PROMOTION_TO_PROMOTION_COMMENT_TB: "fk_promotion_post_tb_to_promotion_comment_tb",
     // 홍보 게시글에 답글 작성 시 fk제약
+    FK_ACCOUNT_TO_PROMOTION_REPLY_TB: "fk_account_tb_to_promotion_reply_tb",
+    FK_PROMOTION_COMMENT_TO_PROMOTION_REPLY_TB: "fk_promotion_comment_tb_to_promotion_reply_tb"
 }

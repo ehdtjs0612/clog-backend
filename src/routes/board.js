@@ -18,13 +18,18 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
     try {
         validate(clubId, "clubId").checkInput().isNumber();
 
-        const selectBoardListSql = `SELECT id, name FROM club_board_tb WHERE club_id = $1`;
+        const selectBoardListSql = `SELECT 
+                                        id,
+                                        name
+                                    FROM
+                                        club_board_tb 
+                                    WHERE 
+                                        club_id = $1`;
         const selectBoardListParam = [clubId];
         const selectBoardListData = await pool.query(selectBoardListSql, selectBoardListParam);
         if (selectBoardListData.rowCount === 0) {
-            throw new BadRequestException('존재하지 않는 동아리입니다.');
+            throw new BadRequestException('해당 동아리에 게시판이 존재하지 않습니다');
         }
-
         result.data = {
             boards: selectBoardListData.rows
         }
@@ -37,6 +42,7 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
 });
 
 // 게시판 생성 api
+// 권한: 해당 동아리의 관리자
 router.post("/", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) => {
     const { clubId, name } = req.body;
     const result = {
@@ -110,9 +116,9 @@ router.delete("/", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next
         validate(boardId, "boardId").checkInput().isNumber();
 
         const deleteBoardSql = `DELETE FROM
-                                            club_board_tb
+                                    club_board_tb
                                 WHERE
-                                            id = $1`;
+                                    id = $1`;
         const deleteBoardParam = [boardId];
         const deleteBoardData = await pool.query(deleteBoardSql, deleteBoardParam);
         if (deleteBoardData.rowCount === 0) {

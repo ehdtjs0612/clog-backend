@@ -251,7 +251,7 @@ router.put("/", loginAuth, async (req, res, next) => {
         if (selectAuthData.position === null) {
             throw new BadRequestException("해당 동아리에 가입되어있지 않습니다");
         }
-        if (selectAuthData.position >= POSITION.MANAGER && selectAuthData.accountId !== userId) {
+        if (selectAuthData.position > POSITION.MANAGER && selectAuthData.accountId !== userId) {
             throw new BadRequestException("수정 권한이 없습니다");
         }
         // 댓글 수정 시작
@@ -321,7 +321,7 @@ router.delete("/", loginAuth, async (req, res, next) => {
         if (selectAuthData.position === null) {
             throw new BadRequestException("해당 동아리에 가입되어있지 않습니다");
         }
-        if (selectAuthData.position >= POSITION.MANAGER && selectAuthData.accountId !== userId) {
+        if (selectAuthData.position > POSITION.MANAGER && selectAuthData.accountId !== userId) {
             throw new BadRequestException("수정 권한이 없습니다");
         }
         // 댓글 삭제 시작

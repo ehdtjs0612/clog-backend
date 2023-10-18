@@ -14,7 +14,7 @@ const notificationApi = require("./routes/notification");
 const boardApi = require("./routes/board");
 const general = require("./routes/general");
 const promotion = require("./routes/promotion");
-const notice = require("./routes/notice/index");
+const notice = require("./routes/notice");
 
 const errorHandling = require("./middleware/errorHandling");
 
@@ -28,7 +28,7 @@ app.use(cookieParser());
 // api call middleware
 app.use("/account", accountApi);
 app.use("/auth", authApi);
-// app.use("/upload", uploadApi);
+app.use("/upload", uploadApi);
 app.use("/club", clubApi);
 app.use("/notification", notificationApi);
 app.use("/board", boardApi);

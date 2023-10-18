@@ -85,7 +85,8 @@ router.post("/", loginAuth, async (req, res, next) => {
 });
 
 // 동아리 프로필 조회 api
-router.get("/:clubId/profile", loginAuth, authCheck(POSITION.MEMBER), async (req, res, next) => {
+router.get("/:clubId/profile", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
     const { clubId } = req.params;
     const result = {
         message: "",
@@ -95,34 +96,50 @@ router.get("/:clubId/profile", loginAuth, authCheck(POSITION.MEMBER), async (req
         validate(clubId, "clubId").checkInput().isNumber();
 
         const selectedClubSql = `SELECT 
-                                        club_tb.name AS "name", 
-                                        belong_tb.name AS "belong", 
-                                        big_category_tb.name AS "bigCategory", 
-                                        small_category_tb.name AS "smallCategory", 
-                                        club_tb.profile_img AS "profileImage", 
-                                        club_tb.banner_img AS "bannerImage",
-                                        club_tb.cover AS "cover", 
-                                        club_tb.theme_color AS "themeColor",
-                                        (
-                                            SELECT
-                                                COUNT(*)
-                                            FROM
-                                                club_member_tb
-                                            WHERE
-                                                club_member_tb.club_id = club_tb.id
-                                        ) AS "memberCount",
-                                        club_tb.created_at AS "createdAt"
-                                 FROM 
-                                        club_tb
-                                 JOIN 
-                                        belong_tb ON club_tb.belong = belong_tb.id
-                                 JOIN   
-                                        big_category_tb ON club_tb.big_category = big_category_tb.id
-                                 JOIN   
-                                        small_category_tb ON club_tb.small_category = small_category_tb.id
-                                 WHERE 
-                                        club_tb.id = $1`
-        const selectedClubParams = [clubId];
+                                    club_tb.name AS "name", 
+                                    belong_tb.name AS "belong", 
+                                    big_category_tb.name AS "bigCategory", 
+                                    small_category_tb.name AS "smallCategory", 
+                                    club_tb.profile_img AS "profileImage", 
+                                    club_tb.banner_img AS "bannerImage",
+                                    club_tb.cover AS "cover", 
+                                    club_tb.theme_color AS "themeColor",
+                                    COUNT(club_member_tb.*)::int AS "memberCount",
+                                    TO_CHAR(club_tb.created_at, 'YYYY.MM.DD') AS "createdAt",
+                                    CASE
+                                        WHEN 
+                                            club_member_tb.position = 0 
+                                        THEN 
+                                            true
+                                        ELSE 
+                                            false
+                                    END AS "manageState"
+                                FROM 
+                                    club_tb
+                                LEFT JOIN
+                                    club_member_tb
+                                ON
+                                    club_member_tb.club_id = $1 AND club_member_tb.account_id = $2
+                                JOIN 
+                                    belong_tb ON club_tb.belong = belong_tb.id
+                                JOIN   
+                                    big_category_tb ON club_tb.big_category = big_category_tb.id
+                                JOIN   
+                                    small_category_tb ON club_tb.small_category = small_category_tb.id
+                                WHERE 
+                                    club_tb.id = $3
+                                GROUP BY 
+                                    club_tb.name, 
+                                    belong_tb.name, 
+                                    big_category_tb.name, 
+                                    small_category_tb.name, 
+                                    club_tb.profile_img, 
+                                    club_tb.banner_img, 
+                                    club_tb.cover, 
+                                    club_tb.theme_color, 
+                                    club_tb.created_at,
+                                    club_member_tb.position`;
+        const selectedClubParams = [clubId, userId, clubId];
 
         const clubProfiledata = await pool.query(selectedClubSql, selectedClubParams);
         if (clubProfiledata.rowCount === 0) {
@@ -144,6 +161,7 @@ router.get("/:clubId/manage", loginAuth, authCheck(POSITION.MANAGER), async (req
 });
 
 // 동아리 수정 api
+// 해당 동아리의 관리자만
 router.put("/", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) => {
     const {
         name, cover, isAllowJoin, themeColor, bannerImg, profileImg
@@ -504,6 +522,7 @@ router.get("/member/:clubId/list", loginAuth, async (req, res, next) => {
 });
 
 // 직급 변경시켜주는 api
+// 이거 버그 졸라많음
 router.put("/position", loginAuth, authCheck(POSITION.PRESIDENT), async (req, res, next) => {
     const decodedId = req.decoded.id;
     const { userId, clubId, position } = req.body;
