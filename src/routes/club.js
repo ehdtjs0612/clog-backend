@@ -331,7 +331,7 @@ router.get("/join-request/:clubId/list", loginAuth, async (req, res, next) => {
                                             account_tb.personal_color AS "personalColor", 
                                             account_tb.entry_year AS "entryYear", 
                                             major_tb.name AS "major", 
-                                            join_request_tb.created_at AS "createdAt" 
+                                            TO_CHAR(join_request_tb.created_at, 'yyyy.mm.dd') AS "createdAt" 
                                       FROM 
                                             join_request_tb 
                                       JOIN 
