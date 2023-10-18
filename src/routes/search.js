@@ -2,12 +2,14 @@ const router = require("express").Router();
 const pool = require('../../config/database/postgresql');
 const loginAuth = require('../middleware/auth/loginAuth');
 const validate = require('../module/validation');
+const { SEARCH } = require("../module/global");
 
 // 동아리 검색 api (대분류, 소분류 기준)
 router.get("/category/list", loginAuth, async (req, res, next) => {
     const { "big-category": bigCategory, "small-category": smallCategory } = req.query;
     const userId = req.decoded.id;
     const page = req.query.page || 1;
+    const offset = (page - 1) * SEARCH.MAX_CLUB_PER_PAGE;
     const result = {
         message: "",
         data: {}
@@ -41,16 +43,16 @@ router.get("/category/list", loginAuth, async (req, res, next) => {
         let selectClubParam = [userId];
         if (bigCategory && smallCategory) {
             // 1. 대분류와 소분류 둘 다 있는 경우
-            selectClubSql += `big_category = $2 AND small_category = $3`;
-            selectClubParam.push(bigCategory, smallCategory);
+            selectClubSql += `big_category = $2 AND small_category = $3 ORDER BY club_tb.created_at DESC OFFSET $4 LIMIT $5`;
+            selectClubParam.push(bigCategory, smallCategory, offset, SEARCH.MAX_CLUB_PER_PAGE);
         } else if (bigCategory && !smallCategory) {
             // 2. 대분류만 있고 소분류가 없는 경우
-            selectClubSql += ` big_category = $2`;
-            selectClubParam.push(bigCategory);
+            selectClubSql += ` big_category = $2 ORDER BY club_tb.created_at DESC OFFSET $3 LIMIT $4`;
+            selectClubParam.push(bigCategory, offset, SEARCH.MAX_CLUB_PER_PAGE);
         } else if (!bigCategory && smallCategory) {
             // 3. 대분류는 없고 소분류만 있는 경우
-            selectClubSql += ` small_category = $2`;
-            selectClubParam.push(smallCategory);
+            selectClubSql += ` small_category = $2 ORDER BY club_tb.created_at DESC OFFSET $3 LIMIT $4`;
+            selectClubParam.push(smallCategory, offset, SEARCH.MAX_CLUB_PER_PAGE);
         }
         const selectClubData = await pool.query(selectClubSql, selectClubParam);
         result.data = {
