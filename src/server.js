@@ -10,11 +10,11 @@ const authApi = require("./routes/auth");
 const uploadApi = require("./routes/upload");
 const clubApi = require("./routes/club");
 const notificationApi = require("./routes/notification");
-
 const boardApi = require("./routes/board");
-const general = require("./routes/general");
-const promotion = require("./routes/promotion");
-const notice = require("./routes/notice");
+const generalApi = require("./routes/general");
+const promotionApi = require("./routes/promotion");
+const noticeApi = require("./routes/notice");
+const searchApi = require("./routes/search");
 
 const errorHandling = require("./middleware/errorHandling");
 
@@ -32,10 +32,11 @@ app.use("/upload", uploadApi);
 app.use("/club", clubApi);
 app.use("/notification", notificationApi);
 app.use("/board", boardApi);
+app.use("/search", searchApi);
 
-app.use("/general", general);
-app.use("/notice", notice);
-app.use("/promotion", promotion);
+app.use("/general", generalApi);
+app.use("/notice", noticeApi);
+app.use("/promotion", promotionApi);
 
 // error handling muddleware
 app.use(errorHandling());
