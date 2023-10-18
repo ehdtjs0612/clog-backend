@@ -18,6 +18,9 @@ module.exports = {
     FK_CLUB_TO_CLUB_MEMBER_TB: "fk_club_tb_to_club_member_tb",
     FK_POSITION_TO_CLUB_POSITION_TB: "fk_position_tb_to_club_member_tb",
 
+    // 동아리 직급 변경 시 fk제약
+    FK_POSITION_TO_CLUB_MEMBER_TB: "fk_position_tb_to_club_member_tb",
+
     // 동아리 게시판 추가 시 fk제약
     FK_CLUB_TO_BOARD_TB: "fk_club_tb_to_club_board_tb",
 

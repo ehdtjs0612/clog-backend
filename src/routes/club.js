@@ -654,7 +654,7 @@ router.put("/position", loginAuth, async (req, res, next) => {
             throw new BadRequestException("권한이 없습니다");
         }
         const { clubId } = selectAuthData.rows[0];
-        // 2. 만약 회장을 넘겨주는 경우 본인의 직급을 운영진으로 변경시켜준 다음 직급을 변경시켜줌
+        // 2. 만약 회장을 넘겨주는 경우 본인의 직급을 운영진으로 변경시켜줌
         if (position === POSITION.PRESIDENT) {
             const downPositionSql = `UPDATE
                                             club_member_tb
@@ -687,10 +687,18 @@ router.put("/position", loginAuth, async (req, res, next) => {
         await pgClient.query("COMMIT");
 
     } catch (error) {
+        if (pgClient) {
+            await pgClient.query("ROLLBACK");
+        }
         if (error.constraint === CONSTRAINT.FK_POSITION_TO_CLUB_MEMBER_TB) {
             return next(new BadRequestException("해당하는 직급이 존재하지 않습니다"));
         }
         return next(error);
+
+    } finally {
+        if (pgClient) {
+            pgClient.release();
+        }
     }
     res.send(result);
 });
