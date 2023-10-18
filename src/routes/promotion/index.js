@@ -5,6 +5,6 @@ const replyApi = require("./reply");
 
 router.use("/", promotionApi);
 router.use("/comment", commentApi);
-// router.use("/reply", replyApi);
+router.use("/reply", replyApi);
 
 module.exports = router;

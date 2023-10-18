@@ -14,7 +14,7 @@ const notificationApi = require("./routes/notification");
 const boardApi = require("./routes/board");
 const general = require("./routes/general");
 const promotion = require("./routes/promotion");
-const notice = require("./routes/notice/notice");
+const notice = require("./routes/notice");
 
 const errorHandling = require("./middleware/errorHandling");
 

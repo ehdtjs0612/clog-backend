@@ -6,8 +6,10 @@ const CONSTRAINT = require("../../module/constraint");
 const { CLUB, POST, POSITION } = require('../../module/global');
 const { BadRequestException } = require('../../module/customError');
 
-// 동아리 내 전체 게시글을 가져오는 api
+// 동아리 내 모든 일반 게시물을 가져오는 api
+// 권한: 해당 동아리에 가입되어있어야 함
 router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
     const { clubId } = req.params;
     const result = {
         message: "",
@@ -19,12 +21,30 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
         validate(clubId, "clubId").checkInput().isNumber();
         validate(page, "page").isNumber().isPositive();
 
-        const selectClubSql = `SELECT id FROM club_tb WHERE club_tb.id = $1`;
-        const selectClubParam = [clubId];
-        const selectClubData = await pool.query(selectClubSql, selectClubParam);
-
-        if (!selectClubData.rowCount) {
+        // 권한 체크
+        const selectAuthSql = `SELECT
+                                    (
+                                        SELECT
+                                            club_member_tb.position
+                                        FROM
+                                            club_member_tb
+                                        WHERE
+                                            club_member_tb.account_id = $1
+                                        AND
+                                            club_member_tb.club_id = club_tb.id
+                                    ) AS "position"
+                                FROM
+                                    club_tb
+                                WHERE
+                                    club_tb.id = $2`;
+        const selectAuthParam = [userId, clubId];
+        const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
+        console.log(selectAuthData.rows);
+        if (selectAuthData.rowCount === 0) {
             return next(new BadRequestException("존재하지 않는 동아리입니다."));
+        }
+        if (selectAuthData.rows[0].position === null) {
+            return next(new BadRequestException("동아리에 가입하지 않은 사용자입니다"));
         }
 
         const offset = (page - 1) * POST.MAX_POST_COUNT_PER_PAGE;
@@ -56,7 +76,7 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
                                                     club_comment_tb.club_post_id = club_post_tb.id
                                             )::int AS "commentCount",
                                             -- COUNT(club_comment_tb.id) AS "commentCount",
-                                            club_post_tb.created_at AS createdAt
+                                            club_post_tb.created_at AS "createdAt"
                                   FROM
                                             club_post_tb
                                   JOIN
@@ -86,7 +106,9 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
 });
 
 // 게시판의 게시물 리스트 조회 api
+// 권한: 해당 동아리에 가입되어있어야 함
 router.get("/list/board/:boardId", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
     const { boardId } = req.params;
     const result = {
         message: "",
@@ -98,6 +120,34 @@ router.get("/list/board/:boardId", loginAuth, async (req, res, next) => {
     try {
         validate(boardId, "boardId").checkInput().isNumber();
         const offset = (page - 1) * POST.MAX_POST_COUNT_PER_PAGE;
+        // 권한 체크
+        const selectAuthSql = `SELECT
+                                    (
+                                        SELECT
+                                            club_member_tb.position
+                                        FROM
+                                            club_member_tb
+                                        WHERE
+                                            club_member_tb.account_id = $1
+                                        AND
+                                            club_member_tb.club_id = club_tb.id
+                                    ) AS "position"
+                                FROM
+                                    club_board_tb
+                                JOIN
+                                    club_tb
+                                ON
+                                    club_board_tb.club_id = club_tb.id
+                                WHERE
+                                    club_board_tb.id = $2`;
+        const selectAuthParam = [userId, boardId];
+        const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
+        if (selectAuthData.rowCount === 0) {
+            return next(new BadRequestException("존재하지 않는 게시판입니다"));
+        }
+        if (selectAuthData.rows[0].position === null) {
+            return next(new BadRequestException("동아리에 가입하지 않은 사용자입니다"));
+        }
 
         const selectPostOfBoardSql = `SELECT 
                                             club_post_tb.id, 
@@ -129,6 +179,7 @@ router.get("/list/board/:boardId", loginAuth, async (req, res, next) => {
 });
 
 // 게시물 조회 api
+// 권한: 해당 동아리에 가입되어있어야 함
 router.get("/:postId", loginAuth, async (req, res, next) => {
     const { postId } = req.params;
     const userId = req.decoded.id;
@@ -140,6 +191,40 @@ router.get("/:postId", loginAuth, async (req, res, next) => {
     try {
         validate(postId, "postId").checkInput().isNumber();
 
+        // 권한 체크
+        const selectAuthSql = `SELECT
+                                    (
+                                        SELECT
+                                            club_member_tb.position
+                                        FROM
+                                            club_member_tb
+                                        WHERE
+                                            club_member_tb.account_id = $1
+                                        AND
+                                            club_member_tb.club_id = club_tb.id
+                                    ) AS "position"
+                                FROM
+                                    club_post_tb
+                                JOIN
+                                    club_board_tb
+                                ON
+                                    club_post_tb.club_board_id = club_board_tb.id
+                                JOIN
+                                    club_tb
+                                ON
+                                    club_board_tb.club_id = club_tb.id
+                                WHERE
+                                    club_post_tb.id = $2`;
+        const selectAuthParam = [userId, postId];
+        const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
+        if (selectAuthData.rowCount === 0) {
+            return next(new BadRequestException("존재하지 않는 게시글입니다"));
+        }
+        if (selectAuthData.rows[0].position === null) {
+            return next(new BadRequestException("동아리에 가입하지 않은 사용자입니다"));
+        }
+
+        // 본인이거나 해당 동아리의 관리자일 경우 manageState: true
         const selectPostSql = `SELECT 
                                     club_post_tb.account_id AS "authorId", 
                                     major_tb.name AS "authorMajor", 
@@ -149,24 +234,49 @@ router.get("/:postId", loginAuth, async (req, res, next) => {
                                     club_post_tb.title AS "postTitle", 
                                     club_post_tb.content AS "postContent", 
                                     TO_CHAR(club_post_tb.created_at, 'yyyy.mm.dd') AS "createdAt",
-                                    club_post_tb.account_id = $2 AS "authorState",
-                                    ARRAY (
+                                CASE
+                                    WHEN
+                                        club_post_tb.account_id = $1
+                                    OR
+                                        club_member_tb.position < 2
+                                    THEN
+                                        true
+                                    ELSE
+                                        false
+                                    END AS "manageState",
+                                ARRAY (
                                         SELECT
-                                            concat(post_img)
+                                            post_img
                                         FROM
                                             post_img_tb
                                         WHERE
-                                            post_id = $1
-                                    ) AS "postImgArray"
+                                            post_id = $2
+                                    ) AS "postImg"
                                 FROM 
                                     club_post_tb 
                                 JOIN 
-                                    account_tb ON club_post_tb.account_id = account_tb.id 
+                                    account_tb 
+                                ON 
+                                    club_post_tb.account_id = account_tb.id 
                                 JOIN 
-                                    major_tb ON account_tb.major = major_tb.id 
+                                    major_tb 
+                                ON 
+                                    account_tb.major = major_tb.id 
+                                JOIN
+                                    club_board_tb
+                                ON
+                                    club_post_tb.club_board_id = club_board_tb.id
+                                JOIN
+                                    club_tb
+                                ON
+                                    club_board_tb.club_id = club_tb.id
+                                JOIN
+                                    club_member_tb
+                                ON
+                                    club_member_tb.club_id = club_tb.id
                                 WHERE 
-                                    club_post_tb.id = $1;`;
-        const selectPostParam = [postId, userId];
+                                    club_post_tb.id = $2`;
+        const selectPostParam = [userId, postId];
         const selectPostData = await pool.query(selectPostSql, selectPostParam);
         if (selectPostData.rowCount !== 0) {
             result.data = {
@@ -224,8 +334,7 @@ router.post("/", loginAuth, async (req, res, next) => {
         if (selectClubAuthData.rowCount === 0) {
             throw new BadRequestException("해당하는 게시판이 존재하지 않습니다");
         }
-
-        if (!selectClubAuthData.rows[0].accountId) {
+        if (selectClubAuthData.rows[0].accountId === null) {
             throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
         }
         // 2. 게시글 테이블에 삽입
@@ -273,6 +382,7 @@ router.post("/", loginAuth, async (req, res, next) => {
 });
 
 // 게시글 수정 api
+// 권한: 작성자 또는 해당 동아리의 관리자
 router.put("/", loginAuth, async (req, res, next) => {
     const { postId, title, content, images } = req.body;
     const userId = req.decoded.id;
@@ -315,13 +425,11 @@ router.put("/", loginAuth, async (req, res, next) => {
                                     WHERE
                                         club_post_tb.id = $1`;
         const selectPositionResult = await pgClient.query(selectPositionSql, [postId, userId]);
-
         if (selectPositionResult.rowCount === 0) {
-            return next(new BadRequestException("게시글이 존재하지 않습니다."));
+            return next(new BadRequestException("게시글이 존재하지 않습니다"));
         }
-
         if (selectPositionResult.rows[0].accountId !== userId && selectPositionResult.rows[0].position > POSITION.MANAGER) {
-            return next(new BadRequestException("수정 권한이 존재하지 않습니다."));
+            return next(new BadRequestException("수정 권한이 없습니다"));
         }
 
         // 1. 게시글 본문 (title, content)수정
@@ -370,6 +478,7 @@ router.put("/", loginAuth, async (req, res, next) => {
 });
 
 // 게시글 삭제 api
+// 권한: 작성자 또는 해당 동아리의 관리자
 router.delete("/", loginAuth, async (req, res, next) => {
     const { postId } = req.body;
     const userId = req.decoded.id;
