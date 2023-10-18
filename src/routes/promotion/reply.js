@@ -27,7 +27,7 @@ router.get("/list/comment/:commentId", loginAuth, async (req, res, next) => {
         const selectReplySql = `SELECT
                                         promotion_reply_tb.id,
                                         promotion_reply_tb.content,
-                                        TO_CHAR(promotion_reply_tb.created_at, 'YYYY.MM.DD') AS "createdAt",
+                                        TO_CHAR(promotion_reply_tb.created_at, 'YYYY.MM.DD.MM:SS') AS "createdAt",
                                         promotion_reply_tb.account_id AS "authorId",
                                         account_tb.entry_year AS "entryYear",
                                         account_tb.name AS "authorName",
@@ -86,6 +86,44 @@ router.get("/list/comment/:commentId", loginAuth, async (req, res, next) => {
             message: selectReplyData.rows
         };
     } catch (error) {
+        return next(error);
+    }
+    res.send(result);
+});
+
+// 홍보 게시물 댓글의 답글 작성
+// 권한: 로그인한 유저
+router.post("/", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
+    const { commentId, content } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(commentId, "commentId").checkInput().isNumber();
+        validate(content, "content").checkInput().checkLength(1, REPLY.MAX_REPLY_CONTENT_LENGTH);
+
+        // 답글 작성
+        const insertReplySql = `INSERT INTO
+                                        promotion_reply_tb (account_id, comment_id, content) 
+                                    VALUES 
+                                        ($1, $2, $3)
+                                    RETURNING
+                                        id`;
+        const insertReplyParam = [userId, commentId, content];
+        const insertReplyData = await pool.query(insertReplySql, insertReplyParam);
+        result.data = {
+            replyId: insertReplyData.rows[0].id
+        };
+    } catch (error) {
+        if (error.constraint === CONSTRAINT.FK_ACCOUNT_TO_PROMOTION_REPLY_TB) {
+            return next(new BadRequestException("해당하는 사용자가 존재하지 않습니다"));
+        }
+        if (error.constraint === CONSTRAINT.FK_PROMOTION_COMMENT_TO_PROMOTION_REPLY_TB) {
+            return next(new BadRequestException("해당하는 댓글이 존재하지 않습니다"));
+        }
         return next(error);
     }
     res.send(result);
