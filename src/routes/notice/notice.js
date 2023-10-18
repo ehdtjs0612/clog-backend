@@ -118,9 +118,9 @@ router.post("/", loginAuth, async (req, res, next) => {
     let pgClient = null
 
     try {
-        validate(clubId,"clubId").checkInput().isNumber()
-        validate(title, "title").checkInput().checkLength(1,NOTICE.MAX_TITLE_LENGTH)
-        validate(content, "content").checkInput().checkLength(1,NOTICE.MAX_CONTENT_LENGTH)
+        validate(clubId, "clubId").checkInput().isNumber()
+        validate(title, "title").checkInput().checkLength(1, NOTICE.MAX_TITLE_LENGTH)
+        validate(content, "content").checkInput().checkLength(1, NOTICE.MAX_CONTENT_LENGTH)
         validate(isFixed, "isFixed").checkInput().isBoolean()
 
         pgClient = await pool.connect()
@@ -130,7 +130,7 @@ router.post("/", loginAuth, async (req, res, next) => {
         const selectPositionSql = `SELECT position
             FROM club_member_tb
             WHERE club_id = $1 AND account_id = $2`
-        const selectPositionParams = [ clubId, userId ]
+        const selectPositionParams = [clubId, userId]
         const selectPositionResult = await pgClient.query(selectPositionSql, selectPositionParams)
 
         if (selectPositionResult.rowCount == 0) throw new BadRequestException("해당 동아리 부원이 아닙니다")
@@ -141,21 +141,21 @@ router.post("/", loginAuth, async (req, res, next) => {
             VALUES ($1, $2, $3, $4, $5) 
             RETURNING id AS "postId"`
 
-        const postNoticeParams = [ userId, clubId, title, content, isFixed ]
+        const postNoticeParams = [userId, clubId, title, content, isFixed]
         const postNoticeResult = await pgClient.query(postNoticeSql, postNoticeParams)
         const postId = postNoticeResult.rows[0].postId
 
         // 이미지 저장
         const postNoticeImgSql = `INSERT INTO notice_post_img_tb (post_id, post_img) 
             VALUES ($1, UNNEST($2::VARCHAR[]))`
-        const postNoticeImgParams = [ postId, images ]
+        const postNoticeImgParams = [postId, images]
         await pgClient.query(postNoticeImgSql, postNoticeImgParams)
         await pgClient.query("COMMIT")
     } catch (error) {
         if (pgClient) {
             await pgClient.query("ROLLBACK")
         }
-        next(error)
+        return next(error)
     } finally {
         if (pgClient) pgClient.release
     }
@@ -175,8 +175,8 @@ router.put("/", loginAuth, async (req, res, next) => {
 
     try {
         validate(noticeId, "noticeId").checkInput().isNumber()
-        validate(title, "title").checkInput().checkLength(1,NOTICE.MAX_TITLE_LENGTH)
-        validate(content, "content").checkInput().checkLength(1,NOTICE.MAX_CONTENT_LENGTH)
+        validate(title, "title").checkInput().checkLength(1, NOTICE.MAX_TITLE_LENGTH)
+        validate(content, "content").checkInput().checkLength(1, NOTICE.MAX_CONTENT_LENGTH)
         validate(isFixed, "isFixed").checkInput().isBoolean()
 
         pgClient = await pool.connect()
@@ -191,7 +191,7 @@ router.put("/", loginAuth, async (req, res, next) => {
                 FROM notice_post_tb
                 WHERE notice_post_tb.id = $2 
             )`
-        const selectPositionParams = [ userId, noticeId ]
+        const selectPositionParams = [userId, noticeId]
         const selectPositionResult = await pgClient.query(selectPositionSql, selectPositionParams)
 
         if (selectPositionResult.rowCount == 0) throw new BadRequestException("해당 동아리 부원이 아닙니다")
@@ -201,7 +201,7 @@ router.put("/", loginAuth, async (req, res, next) => {
         const updateNoticeSql = `UPDATE notice_post_tb 
             SET title = $1, content = $2, is_fixed = $3 
             WHERE id = $4`
-        const updateNoticeParams = [ title, content, isFixed, noticeId ]
+        const updateNoticeParams = [title, content, isFixed, noticeId]
         const updateNoticeResult = await pgClient.query(updateNoticeSql, updateNoticeParams)
         if (updateNoticeResult.rowCount == 0) throw new BadRequestException("일치하는 공지 게시물이 없습니다")
 
@@ -222,7 +222,7 @@ router.put("/", loginAuth, async (req, res, next) => {
         if (pgClient) {
             await pgClient.query("ROLLBACK")
         }
-        next(error)
+        return next(error)
     } finally {
         if (pgClient) pgClient.release
     }
@@ -255,7 +255,7 @@ router.delete("/", loginAuth, async (req, res, next) => {
                 FROM notice_post_tb
                 WHERE notice_post_tb.id = $2 
             )`
-        const selectPositionParams = [ userId, noticeId ]
+        const selectPositionParams = [userId, noticeId]
         const selectPositionResult = await pgClient.query(selectPositionSql, selectPositionParams)
 
         if (selectPositionResult.rowCount == 0) throw new BadRequestException("해당 동아리 부원이 아닙니다")
@@ -264,7 +264,7 @@ router.delete("/", loginAuth, async (req, res, next) => {
         // 공지 게시물 삭제
         const deleteNoticeSql = `DELETE FROM notice_post_tb 
             WHERE id = $2`
-        const deleteNoticeParams = [ noticeId ]
+        const deleteNoticeParams = [noticeId]
         const deleteNoticeResult = await pgClient.query(deleteNoticeSql, deleteNoticeParams)
 
         if (deleteNoticeResult == 0) throw new BadRequestException("일치하는 공지 게시물이 없습니다")
@@ -272,7 +272,7 @@ router.delete("/", loginAuth, async (req, res, next) => {
         // 이미지 삭제
         const deleteNoticeImgSql = `DELETE FROM notice_post_img_tb
             WHERE post_id = $1`
-        const deleteNoticeImgParams = [ noticeId ]
+        const deleteNoticeImgParams = [noticeId]
         await pgClient.query(deleteNoticeImgSql, deleteNoticeImgParams)
 
         await pgClient.query("COMMIT")
@@ -280,7 +280,7 @@ router.delete("/", loginAuth, async (req, res, next) => {
         if (pgClient) {
             await pgClient.query("ROLLBACK")
         }
-        next(error)
+        return next(error)
     } finally {
         if (pgClient) pgClient.release
     }
@@ -321,7 +321,7 @@ router.get("/:noticeId", loginAuth, async (req, res, next) => {
             "content",
             "createdAt"`
         const selectNoticeParams = [noticeId]
-        const selectNoticeResult = await pgClient.query(selectNoticeSql,selectNoticeParams)
+        const selectNoticeResult = await pgClient.query(selectNoticeSql, selectNoticeParams)
 
         result.data = selectNoticeResult.rows[0]
 
@@ -334,17 +334,17 @@ router.get("/:noticeId", loginAuth, async (req, res, next) => {
                 FROM notice_post_tb
                 WHERE notice_post_tb.id = $2 
             )`
-        const selectPositionParams = [ userId, noticeId ]
+        const selectPositionParams = [userId, noticeId]
         const selectPositionResult = await pgClient.query(selectPositionSql, selectPositionParams)
 
-        result.data.managerState = ( selectNoticeResult.rows[0] >= 2 ? false : true )
+        result.data.managerState = (selectNoticeResult.rows[0] >= 2 ? false : true)
 
         await pgClient.query("COMMIT")
     } catch (error) {
         if (pgClient) {
             await pgClient.query("ROLLBACK")
         }
-        next(error)
+        return next(error)
     } finally {
         if (pgClient) pgClient.release
     }
