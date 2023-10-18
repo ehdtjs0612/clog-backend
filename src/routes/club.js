@@ -298,7 +298,9 @@ router.post("/join-request", loginAuth, async (req, res, next) => {
 });
 
 // 동아리 가입 신청 리스트 조회 api
-router.get("/join-request/:clubId/list", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) => {
+// 권한: 해당 동아리의 관리자인지
+router.get("/join-request/:clubId/list", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
     const { clubId } = req.params;
     const result = {
         message: "",
@@ -307,6 +309,20 @@ router.get("/join-request/:clubId/list", loginAuth, authCheck(POSITION.MANAGER),
 
     try {
         validate(clubId, "club-id").checkInput().isNumber();
+        // 권한 체크
+        const selectAuthSql = `SELECT
+                                    club_member_tb.position
+                                FROM
+                                    club_member_tb
+                                WHERE
+                                    club_member_tb.club_id = $1
+                                AND
+                                    club_member_tb.account_id = $2`;
+        const selectAuthParam = [clubId, userId];
+        const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
+        if (selectAuthData.rowCount === 0 || selectAuthData.rows[0]?.position > POSITION.MANAGER) {
+            throw new BadRequestException("권한이 없습니다");
+        }
 
         const selectJoinRequestSql = `SELECT 
                                             join_request_tb.id AS "requestId",
