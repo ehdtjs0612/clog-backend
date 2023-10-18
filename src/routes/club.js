@@ -357,7 +357,8 @@ router.get("/join-request/:clubId/list", loginAuth, async (req, res, next) => {
 });
 
 // 동아리 가입 신청 승인 api
-router.post("/member", loginAuth, authCheck(POSITION.MANAGER), async (req, res, next) => {
+router.post("/member", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
     const { requestId } = req.body;
     const result = {
         message: "",
@@ -371,8 +372,40 @@ router.post("/member", loginAuth, authCheck(POSITION.MANAGER), async (req, res, 
         pgClient = await pool.connect();
         // 트랜잭션 시작
         await pgClient.query("BEGIN");
+
+        // 권한 체크
+        // 해당 동아리의 운영진인지?
+        const selectAuthSql = `SELECT
+                                    (
+                                        SELECT
+                                            club_member_tb.position
+                                        FROM
+                                            club_member_tb
+                                        WHERE
+                                            club_member_tb.account_id = $1
+                                        AND
+                                            club_member_tb.club_id = club_tb.id
+                                    ) AS "position"
+                                FROM
+                                    join_request_tb
+                                JOIN
+                                    club_tb
+                                ON
+                                    join_request_tb.club_id = club_tb.id
+                                WHERE
+                                    join_request_tb.id = $2`;
+        const selectAuthParam = [userId, requestId];
+        const selectAuthData = await pgClient.query(selectAuthSql, selectAuthParam);
+        if (selectAuthData.rowCount === 0) {
+            throw new BadRequestException("해당하는 요청이 존재하지 않습니다");
+        }
+        if (selectAuthData.rows[0]?.position > POSITION.MANAGER) {
+            throw new BadRequestException("권한이 없습니다");
+        }
+
+        // 이미 가입 신청한 유저인지 확인
         const selectJoinRequestMemberSql = `SELECT 
-                                                    account_id AS "userId", 
+                                                    account_id AS "accountId", 
                                                     club_id AS "clubId" 
                                             FROM 
                                                     join_request_tb 
@@ -385,13 +418,13 @@ router.post("/member", loginAuth, authCheck(POSITION.MANAGER), async (req, res, 
             throw new BadRequestException("가입 신청 목록에 해당 유저가 존재하지 않습니다");
         }
         // 가입 요청 테이블에서 해당 요청 인덱스에 대한 userId와 clubId를 추출
-        const { userId, clubId } = selectJoinRequestData.rows[0];
+        const { accountId, clubId } = selectJoinRequestData.rows[0];
         // 추출한 userId와 clubId를 통해 club_member_tb로 유저를 삽입
         const insertMemberSql = `INSERT INTO 
                                             club_member_tb (account_id, club_id, position)
                                    VALUES
                                             ($1, $2, $3)`;
-        const insertMemberParams = [userId, clubId, POSITION.MEMBER];
+        const insertMemberParams = [accountId, clubId, POSITION.MEMBER];
         await pgClient.query(insertMemberSql, insertMemberParams);
         // 위 두 작업이 완료되면 가입 요청 테이블에 해당 요청 인덱스를 제거
         const deleteJoinRequestMemberSql = `DELETE FROM 
