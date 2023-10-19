@@ -2,7 +2,7 @@ const router = require("express").Router()
 const pool = require("../../../config/database/postgresql")
 const loginAuth = require("../../middleware/auth/loginAuth")
 const validate = require("../../module/validation")
-const { NOTICE, NOTICE_COMMENT } = require("../../module/global")
+const { NOTICE, NOTICE_COMMENT, POSITION } = require("../../module/global")
 const { BadRequestException } = require("../../module/customError")
 
 // 공지 게시물 댓글 작성
@@ -73,15 +73,40 @@ router.put("/", loginAuth, async (req, res, next) => {
         pgClient = await pool.connect()
         await pgClient.query("BEGIN")
 
+        // 작성 권한 체크
+        const selectPositionSql = `SELECT 
+                notice_comment_tb.account_id AS "authorId",
+                (
+                    SELECT club_member_tb.position
+                    FROM club_member_tb
+                    WHERE club_member_tb.club_id = notice_post_tb.club_id
+                    AND club_member_tb.account_id = $1
+                ) AS "position"
+            FROM notice_comment_tb
+            JOIN notice_post_tb 
+            ON notice_comment_tb.notice_post_id = notice_post_tb.id
+            WHERE notice_comment_tb.id = $2`
+        const selectPositionParams = [userId, commentId]
+        const selectPositionResult = await pgClient.query(selectPositionSql,selectPositionParams)
+
+        if (selectPositionResult.rowCount == 0) {
+            throw new BadRequestException("댓글이 존재하지 않습니다")
+        }
+
+        if (selectPositionResult.rows[0].position = null) {
+            throw new BadRequestException("해당 동아리의 부원이 아닙니다")
+        }
+        
+        if (selectPositionResult.rows[0].position > POSITION.MANAGER && selectPositionResult.rows[0].authorId != userId){
+            throw new BadRequestException("댓글을 수정할 권한이 없습니다")
+        }
+
         // 공지 답글 수정
         const updateCommentSql = `UPDATE notice_comment_tb
             SET content = $1
-            WHERE notice_comment_tb.id = $2 AND notice_comment_tb.account_id = $3`
-        const updateCommentParams = [content, commentId, userId]
+            WHERE notice_comment_tb.id = $2`
+        const updateCommentParams = [content, commentId]
         const updateCommentResult = await pgClient.query(updateCommentSql,updateCommentParams)
-        
-        // 댓글이 없거나, 내가 작성한 댓글이 아닌 경우
-        if (updateCommentResult.rowCount == 0) throw new BadRequestException ("수정 가능한 댓글이 없습니다")
 
         await pgClient.query("COMMIT")
     } catch (error) {
@@ -112,14 +137,39 @@ router.delete("/", loginAuth, async (req, res, next) => {
         pgClient = await pool.connect()
         await pgClient.query("BEGIN")
 
+            // 작성 권한 체크
+        const selectPositionSql = `SELECT 
+            notice_comment_tb.account_id AS "authorId",
+                (
+                    SELECT club_member_tb.position
+                    FROM club_member_tb
+                    WHERE club_member_tb.club_id = notice_post_tb.club_id
+                    AND club_member_tb.account_id = $1
+                ) AS "position"
+            FROM notice_comment_tb
+            JOIN notice_post_tb 
+            ON notice_comment_tb.notice_post_id = notice_post_tb.id
+            WHERE notice_comment_tb.id = $2`
+        const selectPositionParams = [userId, commentId]
+        const selectPositionResult = await pgClient.query(selectPositionSql,selectPositionParams)
+
+        if (selectPositionResult.rowCount == 0) {
+            throw new BadRequestException("댓글이 존재하지 않습니다")
+        }
+
+        if (selectPositionResult.rows[0].position = null) {
+            throw new BadRequestException("해당 동아리의 부원이 아닙니다")
+        }
+        
+        if (selectPositionResult.rows[0].position > POSITION.MANAGER && selectPositionResult.rows[0].authorId != userId){
+            throw new BadRequestException("댓글을 삭제할 권한이 없습니다")
+        }
+
         // 공지 댓글 삭제
         const deleteCommentSql = `DELETE FROM notice_comment_tb
-            WHERE notice_comment_tb.id = $1 AND notice_comment_tb.account_id = $2`
-        const deleteCommentParams = [commentId, userId]
+            WHERE notice_comment_tb.id = $1`
+        const deleteCommentParams = [commentId]
         const deleteCommentResult = await pgClient.query(deleteCommentSql,deleteCommentParams)
-
-        // 댓글이 없거나 내가 작성한 댓글이 아닌 경우
-        if (deleteCommentResult.rowCount == 0) throw new BadRequestException("삭제 가능한 댓글이 없습니다")
 
         await pgClient.query("COMMIT")
     } catch (error) {
@@ -167,7 +217,7 @@ router.get("/:noticeId/list", loginAuth, async (req, res, next) => {
                 ), false
             ) AS "manageState",
             (
-                SELECT COUNT (1)::int
+                SELECT COUNT (*)
                 FILTER (WHERE notice_reply_tb.notice_comment_id = notice_comment_tb.id)
                 FROM notice_reply_tb
             )::int AS "replyCount"
@@ -180,9 +230,9 @@ router.get("/:noticeId/list", loginAuth, async (req, res, next) => {
             LIMIT $3
             OFFSET $4`
         const selectCommentListParams = [userId, noticeId, NOTICE_COMMENT.MAX_COMMENT_COUNT_PER_POST, NOTICE_COMMENT.MAX_COMMENT_COUNT_PER_POST * (page - 1)]
-        await pgClient.query(selectCommentListSql,selectCommentListParams)
-        
-        result.data = selectCommentData
+        const selectCommentListResult = await pgClient.query(selectCommentListSql,selectCommentListParams)
+
+        result.data = selectCommentListResult.rows
 
         await pgClient.query("COMMIT")
     } catch (error) {
