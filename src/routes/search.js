@@ -3,6 +3,7 @@ const pool = require('../../config/database/postgresql');
 const loginAuth = require('../middleware/auth/loginAuth');
 const validate = require('../module/validation');
 const { SEARCH } = require("../module/global");
+const { BadRequestException } = require('../module/customError');
 
 // 동아리 검색 api (대분류, 소분류 기준)
 router.get("/category/list", loginAuth, async (req, res, next) => {
@@ -16,8 +17,6 @@ router.get("/category/list", loginAuth, async (req, res, next) => {
     };
 
     try {
-        validate(bigCategory, "big-category"); // 검증 보류
-        validate(smallCategory, "small-category"); // 검증 보류
         validate(page, "page").isNumber().isPositive();
 
         let selectClubSql = `SELECT
@@ -39,21 +38,30 @@ router.get("/category/list", loginAuth, async (req, res, next) => {
                                     club_tb.is_recruit AS "isRecruit"
                                 FROM 
                                     club_tb
-                                WHERE `;
-        let selectClubParam = [userId];
+                                `;
+        const selectClubParam = [offset, SEARCH.MAX_CLUB_PER_PAGE];
         if (bigCategory && smallCategory) {
             // 1. 대분류와 소분류 둘 다 있는 경우
-            selectClubSql += `big_category = $2 AND small_category = $3 ORDER BY club_tb.created_at DESC OFFSET $4 LIMIT $5`;
-            selectClubParam.push(bigCategory, smallCategory, offset, SEARCH.MAX_CLUB_PER_PAGE);
+            selectClubSql += `WHERE big_category = $3 AND small_category = $4`;
+            selectClubParam.push(bigCategory, smallCategory);
         } else if (bigCategory && !smallCategory) {
             // 2. 대분류만 있고 소분류가 없는 경우
-            selectClubSql += ` big_category = $2 ORDER BY club_tb.created_at DESC OFFSET $3 LIMIT $4`;
-            selectClubParam.push(bigCategory, offset, SEARCH.MAX_CLUB_PER_PAGE);
+            selectClubSql += `WHERE big_category = $3`;
+            selectClubParam.push(bigCategory);
         } else if (!bigCategory && smallCategory) {
             // 3. 대분류는 없고 소분류만 있는 경우
-            selectClubSql += ` small_category = $2 ORDER BY club_tb.created_at DESC OFFSET $3 LIMIT $4`;
-            selectClubParam.push(smallCategory, offset, SEARCH.MAX_CLUB_PER_PAGE);
+            selectClubSql += `WHERE small_category = $3`;
+            selectClubParam.push(smallCategory);
         }
+        selectClubSql += `
+                            ORDER BY 
+                                club_tb.created_at DESC 
+                            OFFSET 
+                                $1 
+                            LIMIT 
+                                $2`;
+        console.log(selectClubSql);
+        console.log(selectClubParam);
         const selectClubData = await pool.query(selectClubSql, selectClubParam);
         result.data = {
             club: selectClubData.rows
@@ -76,7 +84,6 @@ router.get("/club-name/list", loginAuth, async (req, res, next) => {
     };
 
     try {
-        validate(clubName, "club-name") // 검증 보류
         validate(page, "page").isNumber().isPositive();
 
         const offset = (page - 1) * SEARCH.MAX_CLUB_PER_PAGE_FOR_CLUBNAME;
@@ -125,8 +132,84 @@ router.get("/club-name/list", loginAuth, async (req, res, next) => {
 });
 
 // 동아리 내 게시글 검색 api
-// 동아리 부원만 검색 가능
-router.get("/post/list", loginAuth, async (req, res, next) => {
+// filter: title OR author 택 1
+// 권한: 동아리 부원만 검색 가능
+router.get("/club/:clubId/post/list", loginAuth, async (req, res, next) => {
+    // filter를 보내지 않았을 시 기본값은 title
+    const userId = req.decoded.id;
+    const { clubId } = req.params;
+    const filter = req.query.filter || "title";
+    const search = req.query.search || "";
+    const page = req.query.page || 1;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(page, "page").isNumber().isPositive();
+        const offset = (page - 1) * SEARCH.MAX_CLUB_PER_PAGE;
+        // filter가 title 인지 author 둘중 하나 인지 검사
+        if (filter !== "author" && filter !== "title") {
+            throw new BadRequestException("해당하는 검색 필터가 존재하지 않습니다");
+        }
+        // 권한 체크
+        const selectAuthSql = `SELECT
+                                    club_member_tb.position
+                                FROM
+                                    club_member_tb
+                                WHERE
+                                    club_member_tb.account_id = $1
+                                AND
+                                    club_member_tb.club_id = $2`;
+        const selectAuthParam = [userId, clubId];
+        const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
+        if (selectAuthData.rowCount === 0) {
+            throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
+        }
+        let selectPostSql = `SELECT
+                                    club_post_tb.id,
+                                    account_tb.name AS "authorName",
+                                    club_post_tb.title,
+                                    club_post_tb.content
+                                FROM
+                                    club_post_tb
+                                JOIN
+                                    account_tb
+                                ON
+                                    club_post_tb.account_id = account_tb.id
+                                `;
+        const selectPostParam = [offset, SEARCH.MAX_CLUB_PER_PAGE_FOR_CLUBNAME];
+        // filter가 title인 경우와 author인 경우 분리
+        if (filter === "title") {
+            selectPostSql += `WHERE 
+                                    club_post_tb.title 
+                                LIKE
+                                    $3
+                            `;
+        } else if (filter === "author") {
+            selectPostSql += `WHERE
+                                    account_tb.name
+                                LIKE
+                                    $3 `;
+        }
+        selectPostSql += `ORDER BY
+                                club_post_tb.created_at DESC
+                            OFFSET
+                                $1
+                            LIMIT
+                                $2
+                                `;
+        selectPostParam.push(`%${search}%`);
+        const selectPostData = await pool.query(selectPostSql, selectPostParam);
+        result.data = {
+            posts: selectPostData.rows
+        }
+
+    } catch (error) {
+        return next(error);
+    }
+    res.send(result);
 });
 
 module.exports = router;
