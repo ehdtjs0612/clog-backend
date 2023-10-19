@@ -16,9 +16,9 @@ router.get("/category/list", loginAuth, async (req, res, next) => {
     };
 
     try {
-        validate(bigCategory, "big-category");
-        validate(smallCategory, "small-category");
-        validate(page, "page");
+        validate(bigCategory, "big-category"); // 검증 보류
+        validate(smallCategory, "small-category"); // 검증 보류
+        validate(page, "page").isNumber().isPositive();
 
         let selectClubSql = `SELECT
                                     club_tb.id,
@@ -67,6 +67,61 @@ router.get("/category/list", loginAuth, async (req, res, next) => {
 
 // 동아리 검색 api (동아리 이름 기준)
 router.get("/club-name/list", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
+    const clubName = req.query['club-name'] || "";
+    const page = req.query.page || 1;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(clubName, "club-name") // 검증 보류
+        validate(page, "page").isNumber().isPositive();
+
+        const offset = (page - 1) * SEARCH.MAX_CLUB_PER_PAGE_FOR_CLUBNAME;
+        let selectClubSql = `SELECT
+                                    club_tb.id,
+                                    club_tb.profile_img AS "profileImg",
+                                    club_tb.name AS "name",
+                                    club_tb.cover AS "cover",
+                                    COALESCE(
+                                        (
+                                        SELECT
+                                            club_member_tb.account_id = $3
+                                        FROM
+                                            club_member_tb
+                                        WHERE
+                                            club_member_tb.account_id = $3
+                                        AND
+                                            club_member_tb.club_id = club_tb.id
+                                    ), FALSE) AS "isMember",
+                                    club_tb.is_recruit AS "isRecruit"
+                                FROM
+                                    club_tb
+                                `;
+        const selectClubParam = [offset, SEARCH.MAX_CLUB_PER_PAGE_FOR_CLUBNAME, userId];
+        if (clubName !== "") {
+            selectClubSql += ` WHERE
+                                    club_tb.name
+                                LIKE
+                                    $4`;
+            selectClubParam.push(`%${clubName}%`);
+        }
+        selectClubSql += `ORDER BY
+                                club_tb.created_at DESC
+                            OFFSET
+                                $1
+                            LIMIT
+                                $2`;
+        const selectClubData = await pool.query(selectClubSql, selectClubParam);
+        result.data = {
+            club: selectClubData.rows
+        }
+    } catch (error) {
+        return next(error);
+    }
+    res.send(result);
 });
 
 // 동아리 내 게시글 검색 api
