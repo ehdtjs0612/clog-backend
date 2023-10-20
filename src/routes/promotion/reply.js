@@ -40,16 +40,16 @@ router.get("/list/comment/:commentId", loginAuth, async (req, res, next) => {
                                                 account_tb.major = major_tb.id
                                         ) AS "authorMajor",
                                         account_tb.personal_color AS "authorPcolor",
-                                    CASE
-                                        WHEN 
-                                            promotion_reply_tb.account_id = $1 
-                                        OR 
-                                            club_member_tb.position < 2 
-                                        THEN 
-                                            true
-                                        ELSE 
-                                            false
-                                        END AS "manageState"
+                                        (
+                                            SELECT
+                                                club_member_tb.position < 2 OR club_member_tb.account_id = promotion_reply_tb.account_id
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.account_id = $1
+                                            AND
+                                                club_member_tb.club_id = club_tb.id
+                                        ) AS "manageState"
                                     FROM
                                         promotion_reply_tb
                                     JOIN
@@ -68,19 +68,15 @@ router.get("/list/comment/:commentId", loginAuth, async (req, res, next) => {
                                         club_tb
                                     ON
                                         promotion_tb.club_id = club_tb.id
-                                    LEFT JOIN
-                                        club_member_tb
-                                    ON
-                                        club_member_tb.account_id = $2
                                     WHERE
-                                        promotion_reply_tb.comment_id = $3
+                                        promotion_reply_tb.comment_id = $2
                                     ORDER BY
                                         promotion_reply_tb.created_at DESC
                                     OFFSET
-                                        $4
+                                        $3
                                     LIMIT
-                                        $5`;
-        const selectReplyParam = [userId, userId, commentId, offset, REPLY.MAX_REPLY_COUNT_PER_COMMENT]
+                                        $4`;
+        const selectReplyParam = [userId, commentId, offset, REPLY.MAX_REPLY_COUNT_PER_COMMENT]
         const selectReplyData = await pool.query(selectReplySql, selectReplyParam);
         result.data = {
             message: selectReplyData.rows

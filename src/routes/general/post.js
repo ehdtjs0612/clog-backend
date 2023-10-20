@@ -234,16 +234,16 @@ router.get("/:postId", loginAuth, async (req, res, next) => {
                                     club_post_tb.title AS "postTitle", 
                                     club_post_tb.content AS "postContent", 
                                     TO_CHAR(club_post_tb.created_at, 'yyyy.mm.dd') AS "createdAt",
-                                CASE
-                                    WHEN
-                                        club_post_tb.account_id = $1
-                                    OR
-                                        club_member_tb.position < 2
-                                    THEN
-                                        true
-                                    ELSE
-                                        false
-                                    END AS "manageState",
+                                    COALESCE (
+                                        SELECT
+                                            club_member_tb.position < 2
+                                        FROM
+                                            club_member_tb
+                                        WHERE
+                                            club_member_tb.account_id = $1
+                                        AND
+                                            club_member_tb.club_id = club_tb.id
+                                    ) AS "manageState",
                                 ARRAY (
                                         SELECT
                                             post_img
@@ -270,10 +270,6 @@ router.get("/:postId", loginAuth, async (req, res, next) => {
                                     club_tb
                                 ON
                                     club_board_tb.club_id = club_tb.id
-                                JOIN
-                                    club_member_tb
-                                ON
-                                    club_member_tb.club_id = club_tb.id
                                 WHERE 
                                     club_post_tb.id = $2`;
         const selectPostParam = [userId, postId];
