@@ -2,9 +2,108 @@ const router = require("express").Router();
 const pool = require("../../../config/database/postgresql");
 const loginAuth = require('../../middleware/auth/loginAuth');
 const validate = require('../../module/validation');
-const { PROMOTION, IMAGE, POSITION } = require("../../module/global");
+const { PROMOTION, IMAGE, POSITION, SEARCH } = require("../../module/global");
 const { BadRequestException } = require("../../module/customError");
 const CONSTRAINT = require("../../module/constraint");
+
+// 홍보물 검색 api
+// 이 api search 라우터로 이동시켜줘야하나
+// filter: title OR club-name 택 1
+// 권한: 로그인한 사용자
+router.get("/list", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
+    const filter = req.query.filter || "title"; // 널 코얼레싱 쓰는게 적합?
+    const search = req.query.search || "";
+    const page = req.query.page || 1;
+    const result = {
+        message: "",
+        data: {},
+    };
+
+    try {
+        // filter가 title 인지 club-name 둘중 하나 인지 검사
+        if (filter !== "title" && filter !== "club-name") {
+            throw new BadRequestException("해당하는 검색 필터가 존재하지 않습니다");
+        }
+
+        validate(page, "page").isNumber().isPositive();
+        const offset = (page - 1) * SEARCH.MAX_PROMOTION_PER_PAGE;
+        let selectClubSql = `SELECT
+                                    promotion_tb.id,
+                                    promotion_tb.title,
+                                    (
+                                        SELECT
+                                            promotion_img_tb.post_img
+                                        FROM
+                                            promotion_img_tb
+                                        WHERE
+                                            promotion_img_tb.post_id = promotion_tb.id
+                                        LIMIT 1
+                                    ) AS "thumbnail",
+                                    club_tb.profile_img AS "clubImage",
+                                    club_tb.id AS "clubId",
+                                    club_tb.name AS "clubName",
+                                    (
+                                        SELECT
+                                            COUNT(*)
+                                        FROM
+                                            promotion_comment_tb
+                                        WHERE
+                                            promotion_comment_tb.post_id = promotion_tb.id
+                                    )::int AS "commentCount",
+                                    TO_CHAR(promotion_tb.created_at, 'yyyy.mm.dd') AS "createdAt",
+                                    COALESCE(
+                                        (
+                                            SELECT
+                                                club_member_tb.position < 2
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.account_id = $3
+                                            AND
+                                                club_member_tb.club_id = club_tb.id
+                                    ), false) AS "manageState"
+                                FROM
+                                    promotion_tb
+                                JOIN
+                                    club_tb
+                                ON
+                                    promotion_tb.club_id = club_tb.id
+                                `;
+        const selectClubParam = [offset, SEARCH.MAX_PROMOTION_PER_PAGE, userId];
+        // filter가 title인 경우와 author인 경우 분리
+        if (filter === "title") {
+            selectClubSql += `WHERE 
+                                    promotion_tb.title 
+                                LIKE
+                                    $4
+                            `;
+        } else if (filter === "club-name") {
+            selectClubSql += `WHERE
+                                    club_tb.name
+                                LIKE
+                                    $4 `;
+        }
+        selectClubSql += `ORDER BY
+                                promotion_tb.created_at DESC
+                            OFFSET
+                                $1
+                            LIMIT
+                                $2
+                                `;
+        selectClubParam.push(`%${search}%`);
+        console.log(selectClubSql);
+        console.log(selectClubParam);
+
+        const selectClubData = await pool.query(selectClubSql, selectClubParam);
+        result.data = {
+            posts: selectClubData.rows
+        }
+    } catch (error) {
+        return next(error);
+    }
+    res.send(result);
+});
 
 // 동아리 내 홍보 게시물 조회
 // 권한: 로그인한 사용자라면 다 가능
@@ -98,7 +197,7 @@ router.post("/", loginAuth, async (req, res, next) => {
         const selectAuthParam = [userId, clubId];
         const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
         if (selectAuthData.rowCount === 0) {
-            throw new BadRequestException("해당하는 동아리가 존재하지 않습니다");
+            throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
         }
         if (selectAuthData.rows[0].position > POSITION.MANAGER) {
             throw new BadRequestException("홍보글 작성 권한이 없습니다");

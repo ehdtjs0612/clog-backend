@@ -33,7 +33,8 @@ module.exports = {
 
     SEARCH: {
         MAX_CLUB_PER_PAGE: 10, // 논의(임시)
-        MAX_CLUB_PER_PAGE_FOR_CLUBNAME: 6
+        MAX_CLUB_PER_PAGE_FOR_CLUBNAME: 6,
+        MAX_PROMOTION_PER_PAGE: 15
     },
 
     PROMOTION: {
