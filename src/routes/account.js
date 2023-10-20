@@ -35,9 +35,6 @@ router.post("/", async (req, res, next) => {
         if (data.rowCount !== 0) {
             result.message = "회원가입 성공";
         }
-
-        res.send(result);
-
     } catch (error) {
         if (error.constraint === CONSTRAINT.UNIQUE_EMAIL_TO_ACCOUNT_TB) {
             return next(new BadRequestException("중복된 이메일이 존재합니다"));
@@ -45,36 +42,49 @@ router.post("/", async (req, res, next) => {
         if (error.constraint === CONSTRAINT.FK_MAJOR_TO_ACCOUNT_TB) {
             return next(new BadRequestException("해당하는 전공이 존재하지 않습니다"));
         }
-        next(error);
+        return next(error);
     }
+    res.send(result);
 });
 
 // 프로필 조회
 router.get("/", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
     const result = {
         message: "",
         data: {}
     }
 
     try {
-        const sql = `SELECT 
-        name, personal_color AS "personalColor", major, entry_year AS "entryYear", created_at AS "createdAt" from account_tb WHERE id = $1`;
-        const params = [req.decoded.id];
-        const data = await pool.query(sql, params);
-
-        if (data.rowCount !== 0) {
-            result.message = "프로필 조회 성공";
-            result.data = data.rows[0]
+        const selectProfileSql = `SELECT
+                                        account_tb.name,
+                                        account_tb.personal_color AS "personalColor",
+                                        major_tb.name AS "major",
+                                        account_tb.entry_year AS "entryYear",
+                                        TO_CHAR(account_tb.created_at, 'yyyy.mm.dd') AS "createdAt"
+                                    FROM
+                                        account_tb
+                                    JOIN
+                                        major_tb
+                                    ON
+                                        account_tb.major = major_tb.id
+                                    WHERE
+                                        account_tb.id = $1`;
+        const selectProfileParam = [userId];
+        const selectProfileData = await pool.query(selectProfileSql, selectProfileParam);
+        if (selectProfileData.rowCount === 0) {
+            throw new BadRequestException("해당하는 사용자자 없습니다");
         }
-        res.send(result);
-
+        result.data = selectProfileData.rows[0]
     } catch (error) {
-        next(error);
+        return next(error);
     }
+    res.send(result);
 });
 
 // 계정정보 수정
 router.put("/", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
     const { name, entryYear, major } = req.body;
     const result = {
         message: "",
@@ -86,42 +96,55 @@ router.put("/", loginAuth, async (req, res, next) => {
         validate(major, "major").checkInput().isNumber();
         validate(entryYear, "entryYear").checkInput().isNumber();
 
-        const sql = `UPDATE account_tb SET name = $1, "entry_year" = $2, major = $3 WHERE id = $4`;
-        const params = [name, entryYear, major, req.decoded.id];
-        const data = await pool.query(sql, params);
-
-        if (data.rowCount = !0) {
-            result.message = "계정정보 수정 성공";
-            result.data = data.rows[0]
+        const updateProfileSql = `UPDATE
+                                        account_tb
+                                    SET
+                                        name = $1,
+                                        entry_year = $2,
+                                        major = $3
+                                    WHERE
+                                        id = $4`;
+        const updateProfileParam = [name, entryYear, major, userId];
+        const updateProfileData = await pool.query(updateProfileSql, updateProfileParam);
+        if (updateProfileData.rowCount === 0) {
+            throw new BadRequestException("해당하는 사용자가 존재하지 않습니다");
         }
 
-        res.send(result)
     } catch (error) {
-        next(error)
+        if (error.constraint === CONSTRAINT.FK_MAJOR_TO_ACCOUNT_TB) {
+            return next(new BadRequestException("해당하는 전공이 없습니다"));
+        }
+        return next(error)
     }
+    res.send(result);
 });
 
 // 회원 탈퇴
+// 토큰 블랙리스트?
 router.delete("/", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
     const result = {
         message: "",
         data: {}
     }
-
     try {
-        const sql = `DELETE FROM account_tb WHERE id = $1`;
-        const params = [req.decoded.id];
-        const data = await pool.query(sql, params);
-
-        if (data.rowCount !== 0) {
-            result.message = "계정 삭제 성공";
-            result.data = data.rows[0]
+        const deleteUserSql = `DELETE
+                                    FROM
+                                        account_tb
+                                    WHERE
+                                        id = $1`;
+        const deleteUserParam = [userId];
+        const deleteUserData = await pool.query(deleteUserSql, deleteUserParam);
+        if (deleteUserData.rowCount === 0) {
+            throw new BadRequestException("해당하는 사용자가 존재하지 않습니다");
         }
-
-        res.send(result);
+        redisClient.set(email, authCode.toString());
+        redisClient.expire(email, auth.CERTIFIED_EXPIRE_TIME);
     } catch (error) {
-        next(error);
+        return next(error);
     }
+    res.clearCookie("accessToken");
+    res.send(result);
 });
 
 // 비밀번호 재설정
