@@ -40,16 +40,18 @@ router.get("/list/comment/:commentId", loginAuth, async (req, res, next) => {
                                                 account_tb.major = major_tb.id
                                         ) AS "authorMajor",
                                         account_tb.personal_color AS "authorPcolor",
-                                        (
-                                            SELECT
-                                                club_member_tb.position < 2 OR club_member_tb.account_id = promotion_reply_tb.account_id
-                                            FROM
-                                                club_member_tb
-                                            WHERE
-                                                club_member_tb.account_id = $1
-                                            AND
-                                                club_member_tb.club_id = club_tb.id
-                                        ) AS "manageState"
+                                        COALESCE(
+                                            (
+                                                SELECT
+                                                    club_member_tb.position < 2 OR club_member_tb.account_id = promotion_reply_tb.account_id
+                                                FROM
+                                                    club_member_tb
+                                                WHERE
+                                                    club_member_tb.account_id = $1
+                                                AND
+                                                    club_member_tb.club_id = club_tb.id
+                                            )
+                                        , false) AS "manageState"
                                     FROM
                                         promotion_reply_tb
                                     JOIN

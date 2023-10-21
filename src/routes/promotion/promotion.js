@@ -187,19 +187,24 @@ router.post("/", loginAuth, async (req, res, next) => {
 
         // 권한 체크
         const selectAuthSql = `SELECT
-                                    club_member_tb.position
-                                FROM
-                                    club_member_tb
-                                WHERE
-                                    club_member_tb.account_id = $1
-                                AND
-                                    club_member_tb.club_id = $2`;
+                                    COALESCE(
+                                        (
+                                            SELECT
+                                                club_member_tb.position < 2
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.account_id = $1
+                                            AND
+                                                club_member_tb.club_id = $2
+                                        )
+                                    , false) AS "manageAuth"`
         const selectAuthParam = [userId, clubId];
         const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
         if (selectAuthData.rowCount === 0) {
             throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
         }
-        if (selectAuthData.rows[0].position > POSITION.MANAGER) {
+        if (!selectAuthData.rows[0].manageAuth) {
             throw new BadRequestException("홍보글 작성 권한이 없습니다");
         }
 
@@ -263,16 +268,18 @@ router.put("/", loginAuth, async (req, res, next) => {
         pgClient.query("BEGIN");
         // 권한 체크
         const selectAuthSql = `SELECT
-                                    (
-                                        SELECT
-                                            club_member_tb.position
-                                        FROM
-                                            club_member_tb
-                                        WHERE
-                                            club_member_tb.club_id = club_tb.id
-                                        AND
-                                            club_member_tb.account_id = $1
-                                    ) AS "position"
+                                    COALESCE(
+                                        (
+                                            SELECT
+                                                club_member_tb.position < 2
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.club_id = club_tb.id
+                                            AND
+                                                club_member_tb.account_id = $1
+                                        )
+                                    , false) AS "manageAuth"
                                 FROM
                                     promotion_tb
                                 JOIN
@@ -286,7 +293,7 @@ router.put("/", loginAuth, async (req, res, next) => {
         if (selectAuthData.rowCount === 0) {
             throw new BadRequestException("해당하는 홍보물이 존재하지 않습니다");
         }
-        if (selectAuthData.rows[0].position === null || selectAuthData.rows[0].position > POSITION.MANAGER) {
+        if (!selectAuthData.rows[0].manageAuth) {
             throw new BadRequestException("수정 권한이 없습니다");
         }
         // 수정 시작
@@ -344,16 +351,18 @@ router.delete("/", loginAuth, async (req, res, next) => {
 
         // 권한 체크
         const selectAuthSql = `SELECT
-                                    (
-                                        SELECT
-                                            club_member_tb.position
-                                        FROM
-                                            club_member_tb
-                                        WHERE
-                                            club_member_tb.club_id = club_tb.id
-                                        AND
-                                            club_member_tb.account_id = $1
-                                    ) AS "position"
+                                    COALESCE(
+                                        (
+                                            SELECT
+                                                club_member_tb.position < 2
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.club_id = club_tb.id
+                                            AND
+                                                club_member_tb.account_id = $1
+                                        )
+                                    , false) AS "manageAuth"
                                 FROM
                                     promotion_tb
                                 JOIN
@@ -367,7 +376,7 @@ router.delete("/", loginAuth, async (req, res, next) => {
         if (selectAuthData.rowCount === 0) {
             throw new BadRequestException("해당하는 홍보물이 존재하지 않습니다");
         }
-        if (selectAuthData.rows[0].position === null || selectAuthData.rows[0].position > POSITION.MANAGER) {
+        if (!selectAuthData.rows[0].manageAuth) {
             throw new BadRequestException("삭제 권한이 없습니다");
         }
         // 삭제 시작

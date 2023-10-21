@@ -22,16 +22,18 @@ router.get("/list/post/:postId", loginAuth, async (req, res, next) => {
         validate(page, "page").isNumber().isPositive();
 
         const selectClubAuthSql = `SELECT 
-                                (
-                                    SELECT 
-                                        club_member_tb.id 
-                                    FROM 
-                                        club_member_tb 
-                                    WHERE 
-                                        club_member_tb.club_id = club_tb.id
-                                    AND 
-                                        club_member_tb.account_id = $1 
-                                ) AS "accountId" 
+                                    COALESCE(
+                                        (
+                                            SELECT 
+                                                club_member_tb.account_id = $1
+                                            FROM 
+                                                club_member_tb
+                                            WHERE 
+                                                club_member_tb.club_id = club_tb.id
+                                            AND 
+                                                club_member_tb.account_id = $1 
+                                        )
+                                , false) AS "manageAuth" 
                             FROM 
                                 club_post_tb 
                             JOIN 
@@ -49,12 +51,12 @@ router.get("/list/post/:postId", loginAuth, async (req, res, next) => {
         if (selectClubAuthData.rowCount === 0) {
             throw new BadRequestException("해당하는 게시글이 존재하지 않습니다");
         }
-        if (!selectClubAuthData.rows[0].accountId) {
+        if (!selectClubAuthData.rows[0].manageAuth) {
             throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
         }
         const offset = (page - 1) * COMMENT.MAX_COMMENT_COUNT_PER_POST;
         const selectCommentCountSql = `SELECT 
-                                            COUNT(*)
+                                            COUNT(*)::int
                                         FROM
                                             club_comment_tb
                                         WHERE
@@ -91,7 +93,17 @@ router.get("/list/post/:postId", loginAuth, async (req, res, next) => {
                                                 club_member_tb.club_id = club_tb.id
                                         ) AS "authorPosition",
                                         account_tb.personal_color AS "authorPcolor", 
-                                        club_post_tb.account_id = $1 AS "authorState" 
+                                        -- club_post_tb.account_id = $1 AS "authorState"
+                                        (
+                                            SELECT
+                                                club_member_tb.position < 2 OR club_comment_tb.account_id = $1
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.account_id = $1
+                                            AND
+                                                club_member_tb.club_id = club_tb.id
+                                        ) AS "manageState"
                                     FROM 
                                         club_comment_tb 
                                     JOIN 
@@ -145,16 +157,18 @@ router.post("/", loginAuth, async (req, res, next) => {
         validate(postId, "postId").checkInput().isNumber();
         validate(content, "content").checkInput().checkLength(1, COMMENT.MAX_COMMENT_CONTENT_LENGTH);
         const selectClubAuthSql = `SELECT 
+                                    COALESCE(
                                         (
                                             SELECT 
-                                                club_member_tb.id 
+                                                club_member_tb.account_id = $1
                                             FROM 
-                                                club_member_tb 
+                                                club_member_tb
                                             WHERE 
                                                 club_member_tb.club_id = club_tb.id
                                             AND 
                                                 club_member_tb.account_id = $1 
-                                        ) AS "accountId" 
+                                        )
+                                , false) AS "manageAuth" 
                                     FROM 
                                         club_post_tb 
                                     JOIN 
@@ -172,7 +186,7 @@ router.post("/", loginAuth, async (req, res, next) => {
         if (selectClubAuthData.rowCount === 0) {
             throw new BadRequestException("해당하는 게시글이 존재하지 않습니다");
         }
-        if (!selectClubAuthData.rows[0].accountId) {
+        if (!selectClubAuthData.rows[0].manageAuth) {
             throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
         }
 
@@ -217,14 +231,14 @@ router.put("/", loginAuth, async (req, res, next) => {
                                     club_comment_tb.account_id AS "accountId",
                                     (
                                         SELECT
-                                            club_member_tb.position
+                                            club_member_tb.position < 2 OR club_comment_tb.account_id = $1
                                         FROM
                                             club_member_tb
                                         WHERE
                                             club_member_tb.account_id = $1
                                         AND
                                             club_member_tb.club_id = club_tb.id
-                                    ) AS "position"
+                                    ) AS "manageAuth"
                                 FROM
                                     club_comment_tb
                                 JOIN
@@ -242,16 +256,12 @@ router.put("/", loginAuth, async (req, res, next) => {
                                 WHERE
                                     club_comment_tb.id = $2`;
         const selectAuthParam = [userId, commentId];
-        const selectAuthResult = await pool.query(selectAuthSql, selectAuthParam);
+        const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
         // 수정 권한 체크
-        if (selectAuthResult.rowCount === 0) {
+        if (selectAuthData.rowCount === 0) {
             throw new BadRequestException("해당하는 댓글이 존재하지 않습니다");
         }
-        const selectAuthData = selectAuthResult.rows[0];
-        if (selectAuthData.position === null) {
-            throw new BadRequestException("해당 동아리에 가입되어있지 않습니다");
-        }
-        if (selectAuthData.position > POSITION.MANAGER && selectAuthData.accountId !== userId) {
+        if (!selectAuthData.rows[0].manageAuth) {
             throw new BadRequestException("수정 권한이 없습니다");
         }
         // 댓글 수정 시작
@@ -287,14 +297,14 @@ router.delete("/", loginAuth, async (req, res, next) => {
                                     club_comment_tb.account_id AS "accountId",
                                     (
                                         SELECT
-                                            club_member_tb.position
+                                            club_member_tb.position < 2 OR club_comment_tb.account_id = $1
                                         FROM
                                             club_member_tb
                                         WHERE
                                             club_member_tb.account_id = $1
                                         AND
                                             club_member_tb.club_id = club_tb.id
-                                    ) AS "position"
+                                    ) AS "manageAuth"
                                 FROM
                                     club_comment_tb
                                 JOIN
@@ -312,21 +322,16 @@ router.delete("/", loginAuth, async (req, res, next) => {
                                 WHERE
                                     club_comment_tb.id = $2`;
         const selectAuthParam = [userId, commentId];
-        const selectAuthResult = await pool.query(selectAuthSql, selectAuthParam);
+        const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
         // 수정 권한 체크
-        if (selectAuthResult.rowCount === 0) {
+        if (selectAuthData.rowCount === 0) {
             throw new BadRequestException("해당하는 댓글이 존재하지 않습니다");
         }
-        const selectAuthData = selectAuthResult.rows[0];
-        if (selectAuthData.position === null) {
-            throw new BadRequestException("해당 동아리에 가입되어있지 않습니다");
-        }
-        if (selectAuthData.position > POSITION.MANAGER && selectAuthData.accountId !== userId) {
-            throw new BadRequestException("수정 권한이 없습니다");
+        if (!selectAuthData.rows[0].manageAuth) {
+            throw new BadRequestException("삭제 권한이 없습니다");
         }
         // 댓글 삭제 시작
-        const updateCommentSql = `DELETE 
-                                    FROM
+        const updateCommentSql = `DELETE FROM
                                         club_comment_tb
                                     WHERE
                                         id = $1`;
