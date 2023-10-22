@@ -154,15 +154,15 @@ router.get("/list/board/:boardId", loginAuth, async (req, res, next) => {
                                             club_post_tb.title, 
                                             account_tb.name AS "authorName", 
                                             club_post_tb.created_at AS "createdAt" 
-                                      FROM 
+                                        FROM 
                                             club_post_tb 
-                                      JOIN 
+                                        JOIN 
                                             account_tb ON club_post_tb.account_id = account_tb.id 
-                                      WHERE 
+                                        WHERE 
                                             club_board_id = $1 
-                                      OFFSET 
+                                        OFFSET 
                                             $2 
-                                      LIMIT 
+                                        LIMIT 
                                             $3`;
         const selectPostOfBoardParam = [boardId, offset, POST.MAX_POST_COUNT_PER_PAGE];
         const selectPostOfBoardData = await pool.query(selectPostOfBoardSql, selectPostOfBoardParam);
@@ -234,16 +234,18 @@ router.get("/:postId", loginAuth, async (req, res, next) => {
                                     club_post_tb.title AS "postTitle", 
                                     club_post_tb.content AS "postContent", 
                                     TO_CHAR(club_post_tb.created_at, 'yyyy.mm.dd') AS "createdAt",
-                                CASE
-                                    WHEN
-                                        club_post_tb.account_id = $1
-                                    OR
-                                        club_member_tb.position < 2
-                                    THEN
-                                        true
-                                    ELSE
-                                        false
-                                    END AS "manageState",
+                                    COALESCE (
+                                        (
+                                            SELECT
+                                                club_member_tb.position < 2
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.account_id = $1
+                                            AND
+                                                club_member_tb.club_id = club_tb.id
+                                        )
+                                    , false) AS "manageState",
                                 ARRAY (
                                         SELECT
                                             post_img
@@ -270,10 +272,6 @@ router.get("/:postId", loginAuth, async (req, res, next) => {
                                     club_tb
                                 ON
                                     club_board_tb.club_id = club_tb.id
-                                JOIN
-                                    club_member_tb
-                                ON
-                                    club_member_tb.club_id = club_tb.id
                                 WHERE 
                                     club_post_tb.id = $2`;
         const selectPostParam = [userId, postId];
@@ -292,7 +290,7 @@ router.get("/:postId", loginAuth, async (req, res, next) => {
 });
 
 // 게시물 작성 api
-// 권한: 동아리 가입된 사람만 쓸수있음
+// 권한: 해당 동아리에 가입되어있어야 함
 router.post("/", loginAuth, async (req, res, next) => {
     const { boardId, title, content, images } = req.body;
     const userId = req.decoded.id;
@@ -400,18 +398,20 @@ router.put("/", loginAuth, async (req, res, next) => {
         pgClient = await pool.connect();
         await pgClient.query("BEGIN");
         // 본인이 쓴 글이거나 position 0 or 1
-        const selectPositionSql = `SELECT
+        const selectAuthSql = `SELECT
                                         club_post_tb.account_id AS "accountId",
-                                        (
-                                            SELECT
-                                                club_member_tb.position
-                                            FROM
-                                                club_member_tb
-                                            WHERE
-                                                club_member_tb.club_id = club_tb.id
-                                            AND
-                                                club_member_tb.account_id = $2
-                                        ) AS position
+                                        COALESCE(
+                                            (
+                                                SELECT
+                                                    club_member_tb.position < 2 OR club_post_tb.account_id = $1
+                                                FROM
+                                                    club_member_tb
+                                                WHERE
+                                                    club_member_tb.club_id = club_tb.id
+                                                AND
+                                                    club_member_tb.account_id = $1
+                                            )
+                                        , false) AS "manageState"
                                     FROM    
                                         club_post_tb
                                     JOIN
@@ -423,38 +423,42 @@ router.put("/", loginAuth, async (req, res, next) => {
                                     ON
                                         club_board_tb.club_id = club_tb.id
                                     WHERE
-                                        club_post_tb.id = $1`;
-        const selectPositionResult = await pgClient.query(selectPositionSql, [postId, userId]);
-        if (selectPositionResult.rowCount === 0) {
+                                        club_post_tb.id = $2`;
+        const selectAuthParam = [userId, postId];
+        const selectAuthData = await pgClient.query(selectAuthSql, selectAuthParam);
+        if (selectAuthData.rowCount === 0) {
             return next(new BadRequestException("게시글이 존재하지 않습니다"));
         }
-        if (selectPositionResult.rows[0].accountId !== userId && selectPositionResult.rows[0].position > POSITION.MANAGER) {
-            return next(new BadRequestException("수정 권한이 없습니다"));
+        // if (selectPositionResult.rows[0].accountId !== userId && selectPositionResult.rows[0].position > POSITION.MANAGER) {
+        //     return next(new BadRequestException("수정 권한이 없습니다"));
+        // }
+        if (!selectAuthData.rows[0].manageState) {
+            throw new BadRequestException("수정 권한이 없습니다");
         }
 
         // 1. 게시글 본문 (title, content)수정
         const updatePostSql = `UPDATE 
-                                        club_post_tb 
-                               SET 
-                                        title = $1,
-                                        content = $2 
-                               WHERE 
-                                        id = $3`;
+                                    club_post_tb 
+                                SET
+                                    title = $1,
+                                    content = $2 
+                                WHERE 
+                                    id = $3`;
         const updatePostParam = [title, content, postId];
         await pgClient.query(updatePostSql, updatePostParam);
 
         // 2. 기존의 게시글 이미지 삭제
         const deletePostImageSql = `DELETE FROM 
-                                                post_img_tb
-                                    WHERE
-                                                 post_id = $1`;
+                                            post_img_tb 
+                                        WHERE 
+                                            post_id = $1`;
         const deletePostImageParam = [postId];
         await pgClient.query(deletePostImageSql, deletePostImageParam);
         // 3. 다시 게시글 이미지 테이블에 이미지 업로드
         const insertPostImageSql = `INSERT INTO 
-                                                post_img_tb (post_id, post_img) 
-                                    SELECT 
-                                                $1, UNNEST($2::VARCHAR[])`;
+                                            post_img_tb (post_id, post_img) 
+                                        SELECT 
+                                            $1, UNNEST($2::VARCHAR[])`;
         const insertPostImageParam = [postId, images];
         await pgClient.query(insertPostImageSql, insertPostImageParam);
 
@@ -489,18 +493,20 @@ router.delete("/", loginAuth, async (req, res, next) => {
 
     try {
         // 본인이 쓴 글이거나 position 0 or 1
-        const selectAuthorSql = `SELECT 
+        const selectAuthSql = `SELECT 
                                     account_id AS "accountId", 
-                                    (
-                                        SELECT 
-                                            club_member_tb.position 
-                                        FROM 
-                                            club_member_tb 
-                                        WHERE 
-                                            account_id = $1 
-                                        AND 
-                                            club_id = club_tb.id
-                                    ) AS "position"
+                                    COALESCE(
+                                        (
+                                            SELECT 
+                                                club_member_tb.position < 2 OR club_post_tb.account_id = $1
+                                            FROM 
+                                                club_member_tb 
+                                            WHERE 
+                                                account_id = $1 
+                                            AND 
+                                                club_id = club_tb.id
+                                        )
+                                    , false) AS "manageAuth"
                                  FROM
                                     club_post_tb
                                  JOIN
@@ -513,14 +519,21 @@ router.delete("/", loginAuth, async (req, res, next) => {
                                     club_tb.id = club_board_tb.club_id
                                  WHERE
                                     club_post_tb.id = $2`;
-        const selectAuthorParam = [userId, postId];
-        const selectAuthorData = await pool.query(selectAuthorSql, selectAuthorParam);
-        if (selectAuthorData.rowCount === 0) {
+        const selectAuthParam = [userId, postId];
+        const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
+        if (selectAuthData.rowCount === 0) {
             throw new BadRequestException("해당하는 게시글이 존재하지 않습니다");
         }
-        if (selectAuthorData.rows[0].accountId !== userId && selectAuthorData.rows[0].position > POSITION.MANAGER) {
-            throw new BadRequestException("삭제 권한이 존재하지 않습니다");
+        if (!selectAuthData.rows[0].manageAuth) {
+            throw new BadRequestException("삭제 권한이 없습니다");
         }
+        // 삭제 시작
+        const deletePostSql = `DELETE FROM
+                                        club_post_tb
+                                    WHERE
+                                        id = $1`;
+        const deletePostParam = [postId];
+        await pool.query(deletePostSql, deletePostParam);
 
     } catch (error) {
         return next(error);

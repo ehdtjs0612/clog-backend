@@ -40,16 +40,18 @@ router.get("/list/comment/:commentId", loginAuth, async (req, res, next) => {
                                                 account_tb.major = major_tb.id
                                         ) AS "authorMajor",
                                         account_tb.personal_color AS "authorPcolor",
-                                    CASE
-                                        WHEN 
-                                            promotion_reply_tb.account_id = $1 
-                                        OR 
-                                            club_member_tb.position < 2 
-                                        THEN 
-                                            true
-                                        ELSE 
-                                            false
-                                        END AS "manageState"
+                                        COALESCE(
+                                            (
+                                                SELECT
+                                                    club_member_tb.position < 2 OR club_member_tb.account_id = promotion_reply_tb.account_id
+                                                FROM
+                                                    club_member_tb
+                                                WHERE
+                                                    club_member_tb.account_id = $1
+                                                AND
+                                                    club_member_tb.club_id = club_tb.id
+                                            )
+                                        , false) AS "manageState"
                                     FROM
                                         promotion_reply_tb
                                     JOIN
@@ -68,19 +70,15 @@ router.get("/list/comment/:commentId", loginAuth, async (req, res, next) => {
                                         club_tb
                                     ON
                                         promotion_tb.club_id = club_tb.id
-                                    LEFT JOIN
-                                        club_member_tb
-                                    ON
-                                        club_member_tb.account_id = $2
                                     WHERE
-                                        promotion_reply_tb.comment_id = $3
+                                        promotion_reply_tb.comment_id = $2
                                     ORDER BY
                                         promotion_reply_tb.created_at DESC
                                     OFFSET
-                                        $4
+                                        $3
                                     LIMIT
-                                        $5`;
-        const selectReplyParam = [userId, userId, commentId, offset, REPLY.MAX_REPLY_COUNT_PER_COMMENT]
+                                        $4`;
+        const selectReplyParam = [userId, commentId, offset, REPLY.MAX_REPLY_COUNT_PER_COMMENT]
         const selectReplyData = await pool.query(selectReplySql, selectReplyParam);
         result.data = {
             message: selectReplyData.rows
@@ -129,4 +127,133 @@ router.post("/", loginAuth, async (req, res, next) => {
     res.send(result);
 });
 
+// 홍보 게시물 답글 수정
+// 권한: 해당 동아리 관리자 or 답글 작성자
+router.put("/", loginAuth, async (req, res, next) => {
+    const { replyId, content } = req.body;
+    const userId = req.decoded.id;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(replyId, "replyId").checkInput().isNumber();
+        validate(content, "content").checkInput().checkLength(1, REPLY.MAX_REPLY_CONTENT_LENGTH);
+
+        const selectAuthSql = `SELECT
+                                    COALESCE(
+                                        (
+                                            SELECT
+                                                club_member_tb.position < 2 OR promotion_reply_tb.account_id = $1
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.account_id = $1
+                                            AND
+                                                club_member_tb.club_id = club_tb.id
+                                        )
+                                    , false) AS "manageState"
+                                FROM
+                                    promotion_reply_tb
+                                JOIN
+                                    promotion_comment_tb
+                                ON
+                                    promotion_reply_tb.comment_id = promotion_comment_tb.id
+                                JOIN
+                                    promotion_tb
+                                ON
+                                    promotion_comment_tb.post_id = promotion_tb.id
+                                JOIN
+                                    club_tb
+                                ON
+                                    promotion_tb.club_id = club_tb.id
+                                WHERE
+                                    promotion_reply_tb.id = $2`;
+        const selectAuthParam = [userId, replyId];
+        const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
+        if (selectAuthData.rowCount === 0) {
+            throw new BadRequestException("해당하는 댓글이 존재하지 않습니다");
+        }
+        if (!selectAuthData.rows[0].manageState) {
+            throw new BadRequestException("댓글 수정 권한이 없습니다");
+        }
+        const updateReplySql = `UPDATE 
+                                    promotion_reply_tb
+                                SET
+                                    content = $1
+                                WHERE
+                                    id = $2`;
+        const updateReplyParam = [content, replyId];
+        const updateReplyData = await pool.query(updateReplySql, updateReplyParam);
+        if (updateReplyData.rowCount === 0) {
+            throw new BadRequestException("해당하는 댓글이 존재하지 않습니다");
+        }
+    } catch (error) {
+        return next(error);
+    }
+    res.send(result);
+});
+
+
+// 홍보 게시물 답글 삭제
+// 권한: 해당 동아리 관리자 or 답글 작성자
+router.delete("/", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
+    const { replyId } = req.body;
+
+    try {
+        validate(replyId, "replyId").checkInput().isNumber();
+
+        const selectAuthSql = `SELECT
+                                    COALESCE(
+                                        (
+                                            SELECT
+                                                club_member_tb.position < 2 OR promotion_reply_tb.account_id = $1
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.account_id = $1
+                                            AND
+                                                club_member_tb.club_id = club_tb.id
+                                        )
+                                    , false) AS "manageState"
+                                FROM
+                                    promotion_reply_tb
+                                JOIN
+                                    promotion_comment_tb
+                                ON
+                                    promotion_reply_tb.comment_id = promotion_comment_tb.id
+                                JOIN
+                                    promotion_tb
+                                ON
+                                    promotion_comment_tb.post_id = promotion_tb.id
+                                JOIN
+                                    club_tb
+                                ON
+                                    promotion_tb.club_id = club_tb.id
+                                WHERE
+                                    promotion_reply_tb.id = $2`;
+        const selectAuthParam = [userId, replyId];
+        const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
+        if (selectAuthData.rowCount === 0) {
+            throw new BadRequestException("해당하는 댓글이 존재하지 않습니다");
+        }
+        if (!selectAuthData.rows[0].manageState) {
+            throw new BadRequestException("댓글 수정 권한이 없습니다");
+        }
+        // 삭제 시작
+        const deleteReplySql = `DELETE FROM
+                                        promotion_reply_tb
+                                    WHERE
+                                        id = $1`;
+        const deleteReplyParam = [replyId];
+        const deleteReplyData = await pool.query(deleteReplySql, deleteReplyParam);
+        if (deleteReplyData.rowCount === 0) {
+            throw new BadRequestException("해당하는 댓글이 존재하지 않습니다");
+        }
+    } catch (error) {
+        return next(error);
+    }
+});
 module.exports = router;

@@ -32,15 +32,15 @@ router.post("/", loginAuth, async (req, res, next) => {
                 FROM notice_post_tb
                 WHERE notice_post_tb.id = $2 
             )`
-        const selectPositionParams = [ userId, noticeId ]
+        const selectPositionParams = [userId, noticeId]
         const selectPositionResult = await pgClient.query(selectPositionSql, selectPositionParams)
-        
-        if (selectPositionResult.rowCount == 0) throw new BadRequestException ("해당 동아리의 부원이 아닙니다")
+
+        if (selectPositionResult.rowCount == 0) throw new BadRequestException("해당 동아리의 부원이 아닙니다")
 
         // 공지 댓글 작성
         const insertCommentsql = `INSERT INTO notice_comment_tb (account_id, notice_post_id, content) 
             VALUES ($1, $2, $3)`
-        const insertCommentparams = [ userId, noticeId, content ]
+        const insertCommentparams = [userId, noticeId, content]
         await pgClient.query(insertCommentsql, insertCommentparams)
 
         await pgClient.query("COMMIT")

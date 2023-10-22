@@ -18,6 +18,9 @@ module.exports = {
     FK_CLUB_TO_CLUB_MEMBER_TB: "fk_club_tb_to_club_member_tb",
     FK_POSITION_TO_CLUB_POSITION_TB: "fk_position_tb_to_club_member_tb",
 
+    // 동아리 직급 변경 시 fk제약
+    FK_POSITION_TO_CLUB_MEMBER_TB: "fk_position_tb_to_club_member_tb",
+
     // 동아리 게시판 추가 시 fk제약
     FK_CLUB_TO_BOARD_TB: "fk_club_tb_to_club_board_tb",
 
@@ -31,6 +34,10 @@ module.exports = {
     // 일반게시글에 답글 작성 시 fk제약
     FK_ACCOUNT_TO_CLUB_REPLY_TB: "fk_account_tb_to_club_reply_tb",
     FK_COMMENT_TO_CLUB_REPLY_TB: "fk_club_comment_tb_to_club_reply_tb",
+
+    // 공지게시글에 답글 작성 시 fk제약
+    FK_ACCOUNT_TO_NOTICE_REPLY_TB: "fk_account_tb_to_notice_reply_tb",
+    FK_COMMENT_TO_NOTICE_REPLY_TB: "fk_notice_comment_tb_to_notice_reply_tb",
 
     // 홍보게시글 작성 시 fk제약
     FK_CLUB_TO_PROMOTION_POST_TB: "fk_club_tb_to_promotion_post_tb",

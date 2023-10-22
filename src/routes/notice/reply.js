@@ -1,281 +1,294 @@
-const router = require("express").Router()
-const pool = require("../../../config/database/postgresql")
-const loginAuth = require("../../middleware/auth/loginAuth")
-const validate = require("../../module/validation")
-const { NOTICE_REPLY, POSITION } = require("../../module/global")
-const { BadRequestException } = require("../../module/customError")
+const router = require("express").Router();
+const pool = require("../../../config/database/postgresql");
+const loginAuth = require('../../middleware/auth/loginAuth');
+const validate = require('../../module/validation');
+const { REPLY } = require("../../module/global");
+const { BadRequestException } = require('../../module/customError');
+const CONSTRAINT = require("../../module/constraint");
 
-// 공지 답글 작성
-router.post("/", loginAuth, async (req, res, next) => {
-    const { commentId, content } = req.body
-    const userId = req.decoded.id
+// 댓글의 답글 리스트 조회
+// 권한: 로그인한 유저
+router.get("/list/comment/:commentId", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
+    const { commentId } = req.params;
+    const page = req.query.page || 1;
     const result = {
         message: "",
         data: {}
-    }
-
-    let pgClient = null
+    };
 
     try {
-        pgClient = await pool.connect()
-        await pgClient.query("BEGIN")
+        validate(commentId, "comment-id").checkInput().isNumber();
+        const offset = (page - 1) * REPLY.MAX_REPLY_COUNT_PER_COMMENT;
 
-        validate(commentId, "commentId").checkInput().isNumber()
-        validate(content, "content").checkInput().checkLength(1,NOTICE_REPLY.MAX_REPLY_CONTENT_LENGTH)
-
-        pgClient = await pool.connect()
-        await pgClient.query("BEGIN")
-
-        // 작성 권한 체크 (해당 동아리의 부원인지)
-        const selectPositionSql = `SELECT position
-            FROM club_member_tb
-            WHERE account_id = $1
-            AND club_id = (
-                SELECT notice_post_tb.club_id
-                FROM notice_comment_tb
-                JOIN notice_post_tb
-                ON notice_comment_tb.notice_post_id = notice_post_tb.id
-                WHERE notice_comment_tb.id = $2 
-            )`
-        const selectPositionParams = [ userId, commentId ]
-        const selectPositionResult = await pgClient.query(selectPositionSql, selectPositionParams)
-        
-        if (selectPositionResult.rowCount == 0) throw new BadRequestException ("해당 동아리의 부원이 아닙니다")
-
-        // 공지 답글 작성
-        const insertReplySql = `INSERT INTO notice_reply_tb (account_id, notice_comment_id, content)
-            VALUES ($1, $2, $3)`
-        const insertReplyParams = [userId, commentId, content]
-        await pgClient.query(insertReplySql,insertReplyParams)
-
-        await pgClient.query("COMMIT")
-    } catch (error) {
-        if (pgClient) {
-            await pgClient.query("ROLLBACK")
-        }
-        return next(error)
-    } finally {
-        if (pgClient) pgClient.release
-    }
-    res.send(result)
-})
-
-// 공지 답글 수정
-router.put("/", loginAuth, async (req, res, next) => {
-    const { replyId, content } = req.body
-    const userId = req.decoded.id
-    const result = {
-        message: "",
-        data: {}
-    }
-
-    let pgClient = null
-
-    try {
-        pgClient = await pool.connect()
-        await pgClient.query("BEGIN")
-
-        validate(replyId, "replyId").checkInput().isNumber()
-        validate(content, "content").checkInput().checkLength(1,NOTICE_REPLY.MAX_REPLY_CONTENT_LENGTH)
-
-        pgClient = await pool.connect()
-        await pgClient.query("BEGIN")
-
-       // 수정 권한 체크
-       const selectPositionSql = `SELECT 
-            notice_reply_tb.account_id AS "authorId",
-                (
-                    SELECT club_member_tb.position
-                    FROM club_member_tb
-                    WHERE club_member_tb.club_id = notice_post_tb.club_id
-                    AND club_member_tb.account_id = $1
-                ) AS "position"
-            FROM notice_reply_tb
-            JOIN notice_comment_tb
-            ON notice_reply_tb.notice_comment_id = notice_comment_tb.id
-            JOIN notice_post_tb 
-            ON notice_comment_tb.notice_post_id = notice_post_tb.id
-            WHERE notice_reply_tb.id = $2`
-        const selectPositionParams = [userId, replyId]
-        const selectPositionResult = await pgClient.query(selectPositionSql,selectPositionParams)
-        console.log(userId)
-        console.log(selectPositionResult.rows)
-
-        if (selectPositionResult.rowCount == 0) {
-        throw new BadRequestException("답글이 존재하지 않습니다")
-        }
-
-        if (selectPositionResult.rows[0].position == null) {
-        throw new BadRequestException("해당 동아리의 부원이 아닙니다")
-        }
-
-        if (selectPositionResult.rows[0].position > POSITION.MANAGER && selectPositionResult.rows[0].authorId != userId){
-        throw new BadRequestException("답글을 수정할 권한이 없습니다")
-        }
-
-        // 공지 답글 수정
-        const updateReplySql = `UPDATE notice_reply_tb
-            SET content = $1
-            WHERE notice_reply_tb.id = $2`
-        const updateReplyParams = [content, replyId]
-        await pgClient.query(updateReplySql,updateReplyParams)
-
-        await pgClient.query("COMMIT")
-    } catch (error) {
-        if (pgClient) {
-            await pgClient.query("ROLLBACK")
-        }
-        return next(error)
-    } finally {
-        if (pgClient) pgClient.release
-    }
-    res.send(result)
-})
-
-// 공지 답글 삭제
-router.delete("/", loginAuth, async (req, res, next) => {
-    const { replyId } = req.body
-    const userId = req.decoded.id
-    const result = {
-        message: "",
-        data: {}
-    }
-
-    let pgClient = null
-
-    try {
-        pgClient = await pool.connect()
-        await pgClient.query("BEGIN")
-
-        validate(replyId, "replyId").checkInput().isNumber()
-
-        pgClient = await pool.connect()
-        await pgClient.query("BEGIN")
-
-       // 삭제 권한 체크
-       const selectPositionSql = `SELECT 
-            notice_reply_tb.account_id AS "authorId",
-                (
-                    SELECT club_member_tb.position
-                    FROM club_member_tb
-                    WHERE club_member_tb.club_id = notice_post_tb.club_id
-                    AND club_member_tb.account_id = $1
-                ) AS "position"
-            FROM notice_reply_tb
-            JOIN notice_comment_tb
-            ON notice_reply_tb.notice_comment_id = notice_comment_tb.id
-            JOIN notice_post_tb 
-            ON notice_comment_tb.notice_post_id = notice_post_tb.id
-            WHERE notice_reply_tb.id = $2`
-        const selectPositionParams = [userId, replyId]
-        const selectPositionResult = await pgClient.query(selectPositionSql,selectPositionParams)
-
-        if (selectPositionResult.rowCount == 0) {
-        throw new BadRequestException("답글이 존재하지 않습니다")
-        }
-
-        if (selectPositionResult.rows[0].position == null) {
-        throw new BadRequestException("해당 동아리의 부원이 아닙니다")
-        }
-
-        if (selectPositionResult.rows[0].position > POSITION.MANAGER && selectPositionResult.rows[0].authorId != userId){
-        throw new BadRequestException("답글을 삭제할 권한이 없습니다")
-        }
-
-        // 공지 답글 삭제
-        const deleteReplySql = `DELETE FROM notice_reply_tb
-            WHERE notice_reply_tb.id = $1`
-        const deleteReplyParams = [replyId]
-        await pgClient.query(deleteReplySql,deleteReplyParams)
-
-        await pgClient.query("COMMIT")
-    } catch (error) {
-        if (pgClient) {
-            await pgClient.query("ROLLBACK")
-        }
-        return next(error)
-    } finally {
-        if (pgClient) pgClient.release
-    }
-    res.send(result)
-})
-
-// 공지 답글 목록 조회
-router.get("/:commentId/list", loginAuth, async (req, res, next) => {
-    const { commentId } = req.params
-    const { page } = req.query
-    const userId = req.decoded.id
-    const result = {
-        message: "",
-        data: {}
-    }
-
-    let pgClient = null
-
-    try {
-        validate(commentId,"commentId").checkInput().isNumber()
-        validate(page,"page").checkInput().isNumber()
-
-        pgClient = await pool.connect()
-        await pgClient.query("BEGIN")
-
-        // 조회 권한 체크 (해당 동아리의 부원인지)
-        const selectPositionSql = `SELECT position
-            FROM club_member_tb
-            WHERE account_id = $1
-            AND club_id = (
-                SELECT notice_post_tb.club_id
-                FROM notice_comment_tb
-                JOIN notice_post_tb
-                ON notice_comment_tb.notice_post_id = notice_post_tb.id
-                WHERE notice_comment_tb.id = $2 
-            )`
-        const selectPositionParams = [ userId, commentId ]
-        const selectPositionResult = await pgClient.query(selectPositionSql, selectPositionParams)
-        
-        if (selectPositionResult.rowCount == 0) throw new BadRequestException ("해당 동아리의 부원이 아닙니다")
-
-        // 답글 목록 조회
-        const selectCommentListSql = `SELECT notice_reply_tb.id AS "id",
-                notice_comment_tb.content AS "content",
-                TO_CHAR(notice_comment_tb.created_at, 'YYYY-MM-DD') AS "createdAt",
-                notice_comment_tb.account_id AS "authorId",
-                account_tb.name AS "authorName",
-                account_tb.personal_color AS "authorPersonalColor",
-                COALESCE(
-                    (
-                        SELECT club_member_tb.position < 2
-                        FROM club_member_tb
-                        WHERE club_member_tb.club_id = club_tb.id
-                        AND club_member_tb.account_id = $1
-                    ), false
-                ) AS "manageState"
-            FROM notice_reply_tb
-            JOIN notice_comment_tb ON notice_reply_tb.notice_comment_id = notice_comment_tb.id
-            JOIN account_tb ON notice_comment_tb.account_id = account_tb.id
-            JOIN notice_post_tb ON notice_comment_tb.notice_post_id = notice_post_tb.id
-            JOIN club_tb ON notice_post_tb.club_id = club_tb.id
-            WHERE notice_reply_tb.notice_comment_id = $2
-            ORDER BY "createdAt" DESC
-            LIMIT $3
-            OFFSET $4`
-        const selectCommentListParams = [userId, commentId, NOTICE_REPLY.MAX_REPLY_COUNT_PER_COMMENT, NOTICE_REPLY.MAX_REPLY_COUNT_PER_COMMENT * (page - 1)]
-        const selectCommentListResult = await pgClient.query(selectCommentListSql,selectCommentListParams)
-
-        console.log(selectCommentListResult.rows)
+        const selectReplySql = `SELECT
+                                    notice_reply_tb.id,
+                                    notice_reply_tb.content,
+                                    TO_CHAR(notice_reply_tb.created_at, 'yyyy.mm.dd') AS "createdAt",
+                                    notice_reply_tb.account_id AS "authorId",
+                                    account_tb.entry_year AS "entryYear",
+                                    account_tb.name AS "authorName",
+                                    major_tb.name AS "authorMajor",
+                                    account_tb.personal_color AS "authorPcolor",
+                                    COALESCE(
+                                        (
+                                            SELECT
+                                                club_member_tb.position < 2 OR notice_reply_tb.account_id = $1
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.account_id = $1
+                                            AND
+                                                club_member_tb.club_id = club_tb.id
+                                        )
+                                    , false) AS "manageState"
+                                FROM
+                                    notice_reply_tb
+                                JOIN
+                                    account_tb
+                                ON
+                                    notice_reply_tb.account_id = account_tb.id
+                                JOIN
+                                    major_tb
+                                ON
+                                    account_tb.major = major_tb.id
+                                JOIN
+                                    notice_comment_tb
+                                ON
+                                    notice_reply_tb.comment_id = notice_comment_tb.id
+                                JOIN
+                                    notice_post_tb
+                                ON
+                                    notice_comment_tb.post_id = notice_post_tb.id
+                                JOIN
+                                    club_tb
+                                ON
+                                    notice_post_tb.club_id = club_tb.id
+                                WHERE
+                                    notice_reply_tb.comment_id = $2
+                                ORDER BY
+                                    notice_reply_tb.created_at DESC
+                                OFFSET
+                                    $3
+                                LIMIT
+                                    $4`;
+        const selectReplyParam = [userId, commentId, offset, REPLY.MAX_REPLY_COUNT_PER_COMMENT];
+        const selectReplyData = await pool.query(selectReplySql, selectReplyParam);
         result.data = {
-            replies : selectCommentListResult.rows
+            replys: selectReplyData.rows
         }
-
-        await pgClient.query("COMMIT")
     } catch (error) {
-        if (pgClient) {
-            await pgClient.query("ROLLBACK")
-        }
-        return next(error)
-    } finally {
-        if (pgClient) pgClient.release
+        return next(error);
     }
-    res.send(result)
-})
-module.exports = router
+    res.send(result);
+});
+
+// 답글 작성 (공지 게시물)
+// 권한: 동아리의 부원
+router.post("/", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
+    const { commentId, content } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(commentId, "commentId").checkInput().isNumber();
+        validate(content, "content").checkInput().checkLength(1, REPLY.MAX_REPLY_CONTENT_LENGTH);
+
+        const selectAuthSql = `SELECT
+                                    COALESCE(
+                                        (
+                                            SELECT
+                                                club_member_tb.position <= 2
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.account_id = $1
+                                            AND
+                                                club_member_tb.club_id = club_tb.id
+                                        )
+                                    , false) AS "manageAuth"
+                                FROM
+                                    notice_comment_tb
+                                JOIN
+                                    notice_post_tb
+                                ON
+                                    notice_comment_tb.post_id = notice_post_tb.id
+                                JOIN
+                                    club_tb
+                                ON
+                                    notice_post_tb.club_id = club_tb.id
+                                WHERE
+                                    notice_comment_tb.id = $2`;
+        const selectAuthParam = [userId, commentId];
+        const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
+        if (selectAuthData.rowCount === 0) {
+            throw new BadRequestException("해당하는 댓글이 없습니다");
+        }
+        if (!selectAuthData.rows[0].manageAuth) {
+            throw new BadRequestException("해당하는 동아리에 가입되어있지 않습니다");
+        }
+        // 작성 시작
+        const insertPostSql = `INSERT INTO
+                                        notice_reply_tb (account_id, comment_id, content)
+                                    VALUES
+                                        ($1, $2, $3)
+                                    RETURNING
+                                        id`;
+        const insertPostParam = [userId, commentId, content];
+        const insertPostData = await pool.query(insertPostSql, insertPostParam);
+        result.data = {
+            replyId: insertPostData.rows[0].id
+        };
+    } catch (error) {
+        if (error.constraint === CONSTRAINT.FK_ACCOUNT_TO_NOTICE_REPLY_TB) {
+            return next(new BadRequestException("해당하는 사용자가 존재하지 않습니다"));
+        }
+        if (error.constraint === CONSTRAINT.FK_COMMENT_TO_NOTICE_REPLY_TB) {
+            return next(new BadRequestException("해당하는 댓글이 존재하지 않습니다"));
+        }
+        return next(error);
+    }
+    res.send(result);
+});
+
+// 답글 수정 (공지 게시물)
+// 권한: 동아리 관리자 OR 답글 작성자
+router.put("/", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
+    const { replyId, content } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(replyId, "replyId").checkInput().isNumber();
+        validate(content, "content").checkInput().checkLength(1, REPLY.MAX_REPLY_CONTENT_LENGTH);
+
+        // 권한 체크
+        const selectAuthSql = `SELECT
+                                    COALESCE(
+                                        (
+                                            SELECT
+                                                club_member_tb.position < 2 OR notice_reply_tb.account_id = $1
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.account_id = $1
+                                            AND
+                                                club_member_tb.club_id = club_tb.id
+                                        )
+                                    , false) AS "manageState"
+                                FROM
+                                    notice_reply_tb
+                                JOIN
+                                    notice_comment_tb
+                                ON
+                                    notice_reply_tb.comment_id = notice_comment_tb.id
+                                JOIN
+                                    notice_post_tb
+                                ON
+                                    notice_comment_tb.post_id = notice_post_tb.id
+                                JOIN
+                                    club_tb
+                                ON
+                                    notice_post_tb.club_id = club_tb.id
+                                WHERE
+                                    notice_reply_tb.id = $2`;
+        const selectAuthParam = [userId, replyId];
+        const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
+        if (selectAuthData.rowCount === 0) {
+            throw new BadRequestException("해당하는 답글이 없습니다");
+        }
+        if (!selectAuthData.rows[0].manageState) {
+            throw new BadRequestException("수정 권한이 없습니다");
+        }
+        // 수정 시작
+        const updatePostSql = `UPDATE
+                                    notice_reply_tb
+                                SET
+                                    content = $1
+                                WHERE
+                                    id = $2`;
+        const updatePostParam = [content, replyId];
+        const updatePostData = await pool.query(updatePostSql, updatePostParam);
+        if (updatePostData.rowCount === 0) {
+            throw new BadRequestException("해당하는 답글이 존재하지 않습니다");
+        }
+    } catch (error) {
+        return next(error);
+    }
+    res.send(result);
+});
+
+// 답글 삭제 (공지 게시물)
+// 권한: 동아리 관리자 OR 답글 작성자
+router.delete("/", loginAuth, async (req, res, next) => {
+    const userId = req.decoded.id;
+    const { replyId } = req.body;
+    const result = {
+        message: "",
+        data: {}
+    };
+
+    try {
+        validate(replyId, "replyId").checkInput().isNumber();
+
+        // 권한 체크
+        const selectAuthSql = `SELECT
+                                    COALESCE(
+                                        (
+                                            SELECT
+                                                club_member_tb.position < 2 OR notice_reply_tb.account_id = $1
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.account_id = $1
+                                            AND
+                                                club_member_tb.club_id = club_tb.id
+                                        )
+                                    , false) AS "manageState"
+                                FROM
+                                    notice_reply_tb
+                                JOIN
+                                    notice_comment_tb
+                                ON
+                                    notice_reply_tb.comment_id = notice_comment_tb.id
+                                JOIN
+                                    notice_post_tb
+                                ON
+                                    notice_comment_tb.post_id = notice_post_tb.id
+                                JOIN
+                                    club_tb
+                                ON
+                                    notice_post_tb.club_id = club_tb.id
+                                WHERE
+                                    notice_reply_tb.id = $2`;
+        const selectAuthParam = [userId, replyId];
+        const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
+        if (selectAuthData.rowCount === 0) {
+            throw new BadRequestException("해당하는 답글이 없습니다");
+        }
+        if (!selectAuthData.rows[0].manageState) {
+            throw new BadRequestException("삭제 권한이 없습니다");
+        }
+        // 삭제 시작
+        const deletePostSql = `DELETE FROM
+                                        notice_reply_tb
+                                    WHERE
+                                        id = $1`;
+        const deletePostParam = [replyId];
+        const deletePostData = await pool.query(deletePostSql, deletePostParam);
+        if (deletePostData.rowCount === 0) {
+            throw new BadRequestException("해당하는 답글이 존재하지 않습니다");
+        }
+    } catch (error) {
+        return next(error);
+    }
+    res.send(result);
+});
+
+module.exports = router;

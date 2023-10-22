@@ -31,6 +31,12 @@ module.exports = {
         MAX_POST_COUNT_PER_PAGE: 10
     },
 
+    SEARCH: {
+        MAX_CLUB_PER_PAGE: 10, // 논의(임시)
+        MAX_CLUB_PER_PAGE_FOR_CLUBNAME: 6,
+        MAX_PROMOTION_PER_PAGE: 15
+    },
+
     PROMOTION: {
         MAX_PROMOTION_TITLE_LENGTH: 32,
         MAX_PROMOTION_CONTENT_LENGTH: 500,
@@ -88,10 +94,5 @@ module.exports = {
     NOTICE_COMMENT: {
         MAX_COMMENT_COUNT_PER_POST : 10, // 임시
         MAX_COMMENT_CONTENT_LENGTH: 300, // 임시
-    },
-
-    NOTICE_REPLY: {
-        MAX_REPLY_COUNT_PER_COMMENT : 10, // 임시
-        MAX_REPLY_CONTENT_LENGTH: 300, // 임시
     }
 }

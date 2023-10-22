@@ -16,12 +16,11 @@ router.get("/list/comment/:commentId", loginAuth, async (req, res, next) => {
         message: "",
         data: {}
     };
-    const offset = (page - 1) * REPLY.MAX_REPLY_COUNT_PER_COMMENT;
 
     try {
         validate(commentId, "commentId").checkInput().isNumber();
         validate(page, "page").isNumber().isPositive();
-
+        const offset = (page - 1) * REPLY.MAX_REPLY_COUNT_PER_COMMENT;
         const selectClubAuthSql = `SELECT
                                         club_comment_tb.account_id AS "accountId",
                                         (
@@ -229,16 +228,18 @@ router.put("/", loginAuth, async (req, res, next) => {
         // 권한 체크
         const selectAuthSql = `SELECT
                                     club_reply_tb.account_id AS "accountId",
-                                    (
-                                        SELECT
-                                            club_member_tb.position
-                                        FROM
-                                            club_member_tb
-                                        WHERE
-                                            club_member_tb.account_id = $1
-                                        AND
-                                            club_member_tb.club_id = club_tb.id
-                                    ) AS "position"
+                                    COALESCE(
+                                        (
+                                            SELECT
+                                                club_member_tb.position < 2 OR club_reply_tb.account_id = $1
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.account_id = $1
+                                            AND
+                                                club_member_tb.club_id = club_tb.id
+                                        )
+                                    , false) AS "manageAuth"
                                 FROM
                                     club_reply_tb
                                 JOIN
@@ -264,16 +265,19 @@ router.put("/", loginAuth, async (req, res, next) => {
         if (selectAuthData.rowCount === 0) {
             throw new BadRequestException("해당하는 댓글이 존재하지 않습니다");
         }
-        if (selectAuthData.rows[0].position === null) {
-            throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
-        }
-        if (selectAuthData.rows[0].accountId !== userId && selectAuthData.rows[0].position >= POSITION.MANAGER) {
+        // if (selectAuthData.rows[0].position === null) {
+        //     throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
+        // }
+        // if (selectAuthData.rows[0].accountId !== userId && selectAuthData.rows[0].position >= POSITION.MANAGER) {
+        //     throw new BadRequestException("수정 권한이 존재하지 않습니다");
+        // }
+        if (!selectAuthData.rows[0].manageAuth) {
             throw new BadRequestException("수정 권한이 존재하지 않습니다");
         }
 
         // 댓글 수정 시작
         const updateReplySql = `UPDATE
-                                    club_reply_tb
+                                    club_reply_tb 
                                 SET
                                     content = $1
                                 WHERE
@@ -299,16 +303,18 @@ router.delete("/", loginAuth, async (req, res, next) => {
         // 권한 체크
         const selectAuthSql = `SELECT
                                     club_reply_tb.account_id AS "accountId",
-                                    (
-                                        SELECT
-                                            club_member_tb.position
-                                        FROM
-                                            club_member_tb
-                                        WHERE
-                                            club_member_tb.account_id = $1
-                                        AND
-                                            club_member_tb.club_id = club_tb.id
-                                    ) AS "position"
+                                    COALESCE
+                                        (
+                                            SELECT
+                                                club_member_tb.position < 2 OR club_reply_tb.account_id = $1
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.account_id = $1
+                                            AND
+                                                club_member_tb.club_id = club_tb.id
+                                        )
+                                    , flase) AS "manageAuth"
                                 FROM
                                     club_reply_tb
                                 JOIN
@@ -334,10 +340,13 @@ router.delete("/", loginAuth, async (req, res, next) => {
         if (selectAuthData.rowCount === 0) {
             throw new BadRequestException("해당하는 댓글이 존재하지 않습니다");
         }
-        if (selectAuthData.rows[0].position === null) {
-            throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
-        }
-        if (selectAuthData.rows[0].accountId !== userId && selectAuthData.rows[0].position >= POSITION.MANAGER) {
+        // if (selectAuthData.rows[0].position === null) {
+        //     throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
+        // }
+        // if (selectAuthData.rows[0].accountId !== userId && selectAuthData.rows[0].position >= POSITION.MANAGER) {
+        //     throw new BadRequestException("삭제 권한이 존재하지 않습니다");
+        // }
+        if (!selectAuthData.rows[0].manageAuth) {
             throw new BadRequestException("삭제 권한이 존재하지 않습니다");
         }
 
