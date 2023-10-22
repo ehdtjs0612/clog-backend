@@ -155,7 +155,7 @@ router.post("/", loginAuth, async (req, res, next) => {
         if (pgClient) {
             await pgClient.query("ROLLBACK")
         }
-        next(error)
+        return next(error)
     } finally {
         if (pgClient) pgClient.release
     }
@@ -222,7 +222,7 @@ router.put("/", loginAuth, async (req, res, next) => {
         if (pgClient) {
             await pgClient.query("ROLLBACK")
         }
-        next(error)
+        return next(error)
     } finally {
         if (pgClient) pgClient.release
     }
@@ -280,7 +280,7 @@ router.delete("/", loginAuth, async (req, res, next) => {
         if (pgClient) {
             await pgClient.query("ROLLBACK")
         }
-        next(error)
+        return next(error)
     } finally {
         if (pgClient) pgClient.release
     }
@@ -344,7 +344,7 @@ router.get("/:noticeId", loginAuth, async (req, res, next) => {
         if (pgClient) {
             await pgClient.query("ROLLBACK")
         }
-        next(error)
+        return next(error)
     } finally {
         if (pgClient) pgClient.release
     }

@@ -2,7 +2,7 @@ const router = require("express").Router()
 const pool = require("../../../config/database/postgresql")
 const loginAuth = require("../../middleware/auth/loginAuth")
 const validate = require("../../module/validation")
-const { NOTICE, NOTICE_COMMENT, POSITION } = require("../../module/global")
+const { NOTICE_COMMENT, POSITION } = require("../../module/global")
 const { BadRequestException } = require("../../module/customError")
 
 // 공지 게시물 댓글 작성
@@ -18,7 +18,7 @@ router.post("/", loginAuth, async (req, res, next) => {
 
     try {
         validate(noticeId, "noticeId").checkInput().isNumber()
-        validate(content, "content").checkInput().checkLength(1,NOTICE.MAX_COMMENT_CONTENT_LENGTH)
+        validate(content, "content").checkInput().checkLength(1,NOTICE_COMMENT.MAX_COMMENT_CONTENT_LENGTH)
 
         pgClient = await pool.connect()
         await pgClient.query("BEGIN")
@@ -48,7 +48,7 @@ router.post("/", loginAuth, async (req, res, next) => {
         if (pgClient) {
             await pgClient.query("ROLLBACK")
         }
-        next(error)
+        return next(error)
     } finally {
         if (pgClient) pgClient.release
     }
@@ -68,12 +68,12 @@ router.put("/", loginAuth, async (req, res, next) => {
 
     try {
         validate(commentId, "commentId").checkInput().isNumber()
-        validate(content, "content").checkInput().checkLength(1,NOTICE.MAX_COMMENT_CONTENT_LENGTH)
+        validate(content, "content").checkInput().checkLength(1,NOTICE_COMMENT.MAX_COMMENT_CONTENT_LENGTH)
 
         pgClient = await pool.connect()
         await pgClient.query("BEGIN")
 
-        // 작성 권한 체크
+        // 수정 권한 체크
         const selectPositionSql = `SELECT 
                 notice_comment_tb.account_id AS "authorId",
                 (
@@ -93,7 +93,7 @@ router.put("/", loginAuth, async (req, res, next) => {
             throw new BadRequestException("댓글이 존재하지 않습니다")
         }
 
-        if (selectPositionResult.rows[0].position = null) {
+        if (selectPositionResult.rows[0].position == null) {
             throw new BadRequestException("해당 동아리의 부원이 아닙니다")
         }
         
@@ -106,14 +106,14 @@ router.put("/", loginAuth, async (req, res, next) => {
             SET content = $1
             WHERE notice_comment_tb.id = $2`
         const updateCommentParams = [content, commentId]
-        const updateCommentResult = await pgClient.query(updateCommentSql,updateCommentParams)
+        await pgClient.query(updateCommentSql,updateCommentParams)
 
         await pgClient.query("COMMIT")
     } catch (error) {
         if (pgClient) {
             await pgClient.query("ROLLBACK")
         }
-        next(error)
+        return next(error)
     } finally {
         if (pgClient) pgClient.release
     }
@@ -139,13 +139,13 @@ router.delete("/", loginAuth, async (req, res, next) => {
 
             // 작성 권한 체크
         const selectPositionSql = `SELECT 
-            notice_comment_tb.account_id AS "authorId",
-                (
-                    SELECT club_member_tb.position
-                    FROM club_member_tb
-                    WHERE club_member_tb.club_id = notice_post_tb.club_id
-                    AND club_member_tb.account_id = $1
-                ) AS "position"
+                notice_comment_tb.account_id AS "authorId",
+                    (
+                        SELECT club_member_tb.position
+                        FROM club_member_tb
+                        WHERE club_member_tb.club_id = notice_post_tb.club_id
+                        AND club_member_tb.account_id = $1
+                    ) AS "position"
             FROM notice_comment_tb
             JOIN notice_post_tb 
             ON notice_comment_tb.notice_post_id = notice_post_tb.id
@@ -157,7 +157,7 @@ router.delete("/", loginAuth, async (req, res, next) => {
             throw new BadRequestException("댓글이 존재하지 않습니다")
         }
 
-        if (selectPositionResult.rows[0].position = null) {
+        if (selectPositionResult.rows[0].position == null) {
             throw new BadRequestException("해당 동아리의 부원이 아닙니다")
         }
         
@@ -176,7 +176,7 @@ router.delete("/", loginAuth, async (req, res, next) => {
         if (pgClient) {
             await pgClient.query("ROLLBACK")
         }
-        next(error)
+        return next(error)
     } finally {
         if (pgClient) pgClient.release
     }
@@ -197,30 +197,61 @@ router.get("/:noticeId/list", loginAuth, async (req, res, next) => {
 
     try {
         validate(noticeId,"noticeId").checkInput().isNumber()
+        validate(page,"page").checkInput().isNumber()
 
         pgClient = await pool.connect()
         await pgClient.query("BEGIN")
 
+        // 조회 권한 체크
+        const selectPositionSql = `SELECT position
+            FROM club_member_tb
+            WHERE account_id = $1
+            AND club_id = (
+                SELECT notice_post_tb.club_id
+                FROM notice_post_tb
+                WHERE notice_post_tb.id = $2 
+            )`
+        const selectPositionParams = [ userId, noticeId ]
+        const selectPositionResult = await pgClient.query(selectPositionSql, selectPositionParams)
+        
+        if (selectPositionResult.rowCount == 0) throw new BadRequestException ("해당 동아리의 부원이 아닙니다")
+
+        // 전체 댓글 수 조회
+
+        const selectCommentCountSql = `
+            SELECT ( count_list.comment_count + count_list.reply_count )::int AS "count"
+            FROM (
+                SELECT
+                    COUNT (notice_comment_tb.id) AS comment_count,
+                    COUNT (notice_reply_tb.id) AS reply_count
+                FROM notice_reply_tb
+                FULL OUTER JOIN notice_comment_tb
+                ON notice_reply_tb.notice_comment_id = notice_comment_tb.id
+                WHERE notice_comment_tb.notice_post_id = $1
+            ) AS count_list`
+        const selectCommentCountParams = [noticeId]
+        const selectCommentCountResult = await pgClient.query(selectCommentCountSql, selectCommentCountParams)
+
         // 댓글 목록 조회
         const selectCommentListSql = `SELECT notice_comment_tb.id AS "id",
-            notice_comment_tb.content AS "content",
-            TO_CHAR(notice_comment_tb.created_at, 'YYYY-MM-DD') AS "createdAt",
-            notice_comment_tb.account_id AS "authorId",
-            account_tb.name AS "authorName",
-            account_tb.personal_color AS "authorPersonalColor",
-            COALESCE(
+                notice_comment_tb.content AS "content",
+                TO_CHAR(notice_comment_tb.created_at, 'YYYY-MM-DD') AS "createdAt",
+                notice_comment_tb.account_id AS "authorId",
+                account_tb.name AS "authorName",
+                account_tb.personal_color AS "authorPersonalColor",
+                COALESCE(
+                    (
+                        SELECT club_member_tb.position < 2
+                        FROM club_member_tb
+                        WHERE club_member_tb.club_id = club_tb.id
+                        AND club_member_tb.account_id = $1
+                    ), false
+                ) AS "manageState",
                 (
-                    SELECT club_member_tb.position < 2
-                    FROM club_member_tb
-                    WHERE club_member_tb.club_id = club_tb.id
-                    AND club_member_tb.account_id = $1
-                ), false
-            ) AS "manageState",
-            (
-                SELECT COUNT (*)
-                FILTER (WHERE notice_reply_tb.notice_comment_id = notice_comment_tb.id)
-                FROM notice_reply_tb
-            )::int AS "replyCount"
+                    SELECT COUNT (*)
+                    FILTER (WHERE notice_reply_tb.notice_comment_id = notice_comment_tb.id)
+                    FROM notice_reply_tb
+                )::int AS "replyCount"
             FROM notice_comment_tb
             JOIN account_tb ON notice_comment_tb.account_id = account_tb.id
             JOIN notice_post_tb ON notice_comment_tb.notice_post_id = notice_post_tb.id
@@ -232,14 +263,18 @@ router.get("/:noticeId/list", loginAuth, async (req, res, next) => {
         const selectCommentListParams = [userId, noticeId, NOTICE_COMMENT.MAX_COMMENT_COUNT_PER_POST, NOTICE_COMMENT.MAX_COMMENT_COUNT_PER_POST * (page - 1)]
         const selectCommentListResult = await pgClient.query(selectCommentListSql,selectCommentListParams)
 
-        result.data = selectCommentListResult.rows
+        console.log(selectCommentListResult.rows)
+        result.data = {
+            count : selectCommentCountResult.rows[0].count,
+            comments : selectCommentListResult.rows
+        }
 
         await pgClient.query("COMMIT")
     } catch (error) {
         if (pgClient) {
             await pgClient.query("ROLLBACK")
         }
-        next(error)
+        return next(error)
     } finally {
         if (pgClient) pgClient.release
     }

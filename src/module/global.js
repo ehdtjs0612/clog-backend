@@ -76,17 +76,22 @@ module.exports = {
     },
 
     notification: {
-        idLength: 24,
-        limit: 5
+        idLength: 24, // 임시
+        limit: 100 // 임시
     },
 
     NOTICE: {
-        MAX_TITLE_LENGTH: 20,
-        MAX_CONTENT_LENGTH: 500,
-        MAX_COMMENT_CONTENT_LENGTH: 300,
+        MAX_TITLE_LENGTH: 20, // 임시
+        MAX_CONTENT_LENGTH: 500, // 임시
     },
 
     NOTICE_COMMENT: {
-        MAX_COMMENT_COUNT_PER_POST : 10 // 임시
+        MAX_COMMENT_COUNT_PER_POST : 10, // 임시
+        MAX_COMMENT_CONTENT_LENGTH: 300, // 임시
+    },
+
+    NOTICE_REPLY: {
+        MAX_REPLY_COUNT_PER_COMMENT : 10, // 임시
+        MAX_REPLY_CONTENT_LENGTH: 300, // 임시
     }
 }
