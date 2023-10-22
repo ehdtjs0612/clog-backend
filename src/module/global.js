@@ -81,9 +81,9 @@ module.exports = {
         JOIN_ACCEPT: "/club/member"
     },
 
-    notification: {
-        idLength: 24, // 임시
-        limit: 100 // 임시
+    NOTIFICATION: {
+        ID_LENGTH: 24, // 임시
+        LIMIT: 100 // 임시
     },
 
     NOTICE: {

@@ -2,7 +2,7 @@ require("dotenv").config()
 const router = require("express").Router()
 const client = require("mongodb").MongoClient
 const validate = require("../module/validation")
-const { notification } = require("../module/global")
+const { NOTIFICATION } = require("../module/global")
 const { BadRequestException } = require("../module/customError")
 const loginAuth = require("../middleware/auth/loginAuth");
 const notificationSentence = require("../module/notificationSentence")
@@ -22,7 +22,7 @@ router.get("/list", loginAuth, async (req, res, next) => {
         conn = await client.connect(process.env.MONGODB_URL)
 
         const filter = { user_id: userId }
-        const data = await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).find(filter).limit(notification.limit).toArray()
+        const data = await conn.db(process.env.MONGODB_DB).collection(process.env.MONGODB_COLLECTION).find(filter).limit(NOTIFICATION.LIMIT).toArray()
         result.data = notificationSentence(data)
         result.message = "알림 목록 조회 성공"
 
@@ -42,7 +42,7 @@ router.post("/read", loginAuth, async (req, res, next) => {
     }
 
     try {
-        validate(notificationId, "notificationId").checkInput().checkLength(notification.idLength, notification.idLength)
+        validate(notificationId, "notificationId").checkInput().checkLength(NOTIFICATION.ID_LENGTH, NOTIFICATION.ID_LENGTH)
         conn = await client.connect(process.env.MONGODB_URL)
 
         const filter = { _id: new ObjectId(notificationId) }
@@ -76,7 +76,7 @@ router.post("/read-all", loginAuth, async (req, res, next) => {
         const update = { $set: { is_read: true } }
         const pipeline = [
             { $match: userFilter },
-            { $limit: notification.limit },
+            { $limit: NOTIFICATION.LIMIT },
             { $match: isReadFilter },
             { $project: { _id: 1 } }
         ]
@@ -112,7 +112,7 @@ router.get("/count", loginAuth, async (req, res, next) => {
         const isReadFilter = { is_read: false }
         const pipeline = [
             { $match: userFilter },
-            { $limit: notification.limit },
+            { $limit: NOTIFICATION.LIMIT },
             { $match: isReadFilter },
             { $count: "count" }
         ]
