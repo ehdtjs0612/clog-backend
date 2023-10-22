@@ -64,15 +64,15 @@ module.exports = {
         MEMBER: 2       // 부원
     },
 
-    notificationUrl: {
-        clubComment: "/comment",
-        clubReply: "/reply",
-        notiComment: "/notice/comment",
-        notiReply: "/notice/reply",
-        prComment: "/promotion/comment",
-        prReply: "/promotion/reply",
-        gradeUpdate: "/club/position",
-        joinAccept: "/club/member"
+    NOTIFICATION_URL: {
+        CLUB_COMMENT: "/comment",
+        CLUB_REPLY: "/reply",
+        NOTI_COMMENT: "/notice/comment",
+        NOTI_REPLY: "/notice/reply",
+        PR_COMMENT: "/promotion/comment",
+        PR_REPLY: "/promotion/reply",
+        GRADE_UPDATE: "/club/position",
+        JOIN_ACCEPT: "/club/member"
     },
 
     notification: {

@@ -3,14 +3,14 @@ const pool = require("../../config/database/postgresql")
 const client = require("mongodb").MongoClient
 const { BadRequestException } = require("../module/customError")
 
-const { notificationUrl } = require("../module/global")
+const { NOTIFICATION_URL } = require("../module/global")
 
 const createNotification = async (url, key) => {
     let type
     let sql
 
     switch (url) { // api url에 따라 알림 type과 sql 설정
-        case notificationUrl.clubComment:
+        case NOTIFICATION_URL.CLUB_COMMENT:
             type = "club_comment"
             sql = `SELECT account_tb.name AS "author", 
                 club_tb.name  AS "club_name",
@@ -24,7 +24,7 @@ const createNotification = async (url, key) => {
             WHERE club_comment_tb.id = $1`
             break
 
-        case notificationUrl.clubReply:
+        case NOTIFICATION_URL.CLUB_REPLY:
             type = "club_reply"
             sql = `SELECT account_tb.name AS "author",
                     club_tb.name  AS "club_name",
@@ -40,7 +40,7 @@ const createNotification = async (url, key) => {
                 WHERE club_reply_tb.id = $1`
             break
 
-        case notificationUrl.prComment:
+        case NOTIFICATION_URL.PR_COMMENT:
             type = "pr_comment"
             sql = `WITH selected (club_id, post_id) 
                 AS (SELECT promotion_post_tb.club_id,
@@ -59,7 +59,7 @@ const createNotification = async (url, key) => {
                 WHERE club_tb.id = selected.club_id AND club_member_tb.position < 2`
             break
 
-        case notificationUrl.prReply:
+        case NOTIFICATION_URL.PR_REPLY:
             type = "pr_reply"
             sql = `SELECT promotion_comment_tb.account_id AS "user_id",
                 promotion_post_tb.id AS "post_id",
@@ -70,7 +70,7 @@ const createNotification = async (url, key) => {
             WHERE promotion_reply_tb.id = $1`
             break
 
-        case notificationUrl.notiComment:
+        case NOTIFICATION_URL.NOTI_COMMENT:
             type = "noti_comment"
             sql = `SELECT account_tb.name AS "author",
                 club_tb.name  AS "club_name",
@@ -84,7 +84,7 @@ const createNotification = async (url, key) => {
             WHERE notice_comment_tb.id = $1`
             break
 
-        case notificationUrl.notiReply:
+        case NOTIFICATION_URL.NOTI_REPLY:
             type = "noti_reply"
             sql = `SELECT account_tb.name AS "author",
                 club_tb.name  AS "club_name",
@@ -100,7 +100,7 @@ const createNotification = async (url, key) => {
             WHERE notice_reply_tb.id = $1`
             break
 
-        case notificationUrl.gradeUpdate:
+        case NOTIFICATION_URL.GRADE_UPDATE:
             type = "grade_update"
             sql = `SELECT club_member_tb.account_id AS "user_id",
                 club_member_tb.position AS "position",
@@ -111,7 +111,7 @@ const createNotification = async (url, key) => {
             WHERE club_member_tb.id = $1`
             break
 
-        case notificationUrl.joinAccept:
+        case NOTIFICATION_URL.JOIN_ACCEPT:
             type = "join_accept"
             sql = `SELECT club_member_tb.account_id AS "user_id",
                 club_tb.name AS "club_name",
@@ -140,16 +140,16 @@ const createNotification = async (url, key) => {
 
 
     // 답글 알림의 경우 댓글 알림으로 바꿔서 한번 더 실행
-    if (type == "club_reply") {
-        await createNotification(notificationUrl.clubComment, selectedData.rows[0].comment_id)
+    if (type == NOTIFICATION_URL.CLUB_REPLY) {
+        await createNotification(NOTIFICATION_URL.CLUB_COMMENT, selectedData.rows[0].comment_id)
     }
 
-    if (type == "noti_reply") {
-        await createNotification(notificationUrl.notiComment, selectedData.rows[0].comment_id)
+    if (type == NOTIFICATION_URL.NOTI_REPLY) {
+        await createNotification(NOTIFICATION_URL.NOTI_COMMENT, selectedData.rows[0].comment_id)
     }
 
-    if (type == "pr_reply") {
-        await createNotification(notificationUrl.prComment, selectedData.rows[0].comment_id)
+    if (type == NOTIFICATION_URL.PR_REPLY) {
+        await createNotification(NOTIFICATION_URL.PR_COMMENT, selectedData.rows[0].comment_id)
     }
 
     await conn.close()
