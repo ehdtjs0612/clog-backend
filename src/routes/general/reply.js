@@ -16,12 +16,11 @@ router.get("/list/comment/:commentId", loginAuth, async (req, res, next) => {
         message: "",
         data: {}
     };
-    const offset = (page - 1) * REPLY.MAX_REPLY_COUNT_PER_COMMENT;
 
     try {
         validate(commentId, "commentId").checkInput().isNumber();
         validate(page, "page").isNumber().isPositive();
-
+        const offset = (page - 1) * REPLY.MAX_REPLY_COUNT_PER_COMMENT;
         const selectClubAuthSql = `SELECT
                                         club_comment_tb.account_id AS "accountId",
                                         (
