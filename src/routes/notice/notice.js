@@ -302,6 +302,22 @@ router.get("/:noticeId", loginAuth, async (req, res, next) => {
         pgClient = await pool.connect()
         await pgClient.query("BEGIN")
 
+        // 직급 체크
+        const selectPositionSql = `SELECT position
+            FROM club_member_tb
+            WHERE account_id = $1
+            AND club_id = (
+                SELECT notice_post_tb.club_id
+                FROM notice_post_tb
+                WHERE notice_post_tb.id = $2 
+            )`
+        const selectPositionParams = [ userId, noticeId ]
+        const selectPositionResult = await pgClient.query(selectPositionSql, selectPositionParams)
+
+        if (selectPositionResult.rowCount == 0) {
+            throw new BadRequestException("해당 동아리의 부원이 아닙니다")
+        }
+
         // 게시물 조회
         const selectNoticeSql = `SELECT account_tb.id AS "authorId",
                 account_tb.name AS "authorName",
@@ -323,21 +339,8 @@ router.get("/:noticeId", loginAuth, async (req, res, next) => {
         const selectNoticeParams = [noticeId]
         const selectNoticeResult = await pgClient.query(selectNoticeSql,selectNoticeParams)
 
-        result.data = selectNoticeResult.rows[0]
-
-        // 직급 체크
-        const selectPositionSql = `SELECT position
-            FROM club_member_tb
-            WHERE account_id = $1
-            AND club_id = (
-                SELECT notice_post_tb.club_id
-                FROM notice_post_tb
-                WHERE notice_post_tb.id = $2 
-            )`
-        const selectPositionParams = [ userId, noticeId ]
-        const selectPositionResult = await pgClient.query(selectPositionSql, selectPositionParams)
-
-        result.data.managerState = ( selectNoticeResult.rows[0] >= 2 ? false : true )
+        result.data.notice = selectNoticeResult.rows[0]
+        result.data.notice.manageState = ( selectPositionResult.rows[0] >= 2 ? false : true )
 
         await pgClient.query("COMMIT")
     } catch (error) {
