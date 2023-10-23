@@ -70,29 +70,29 @@ module.exports = {
         MEMBER: 2       // 부원
     },
 
-    notificationUrl: {
-        clubComment: "/comment",
-        clubReply: "/reply",
-        notiComment: "/notice/comment",
-        notiReply: "/notice/reply",
-        prComment: "/promotion/comment",
-        prReply: "/promotion/reply",
-        gradeUpdate: "/club/position",
-        joinAccept: "/club/member"
+    NOTIFICATION_URL: {
+        CLUB_COMMENT: "/comment",
+        CLUB_REPLY: "/reply",
+        NOTI_COMMENT: "/notice/comment",
+        NOTI_REPLY: "/notice/reply",
+        PR_COMMENT: "/promotion/comment",
+        PR_REPLY: "/promotion/reply",
+        GRADE_UPDATE: "/club/position",
+        JOIN_ACCEPT: "/club/member"
     },
 
-    notification: {
-        idLength: 24,
-        limit: 5
+    NOTIFICATION: {
+        ID_LENGTH: 24, // 임시
+        LIMIT: 100 // 임시
     },
 
     NOTICE: {
-        MAX_TITLE_LENGTH: 20,
-        MAX_CONTENT_LENGTH: 500,
-        MAX_COMMENT_CONTENT_LENGTH: 300,
+        MAX_TITLE_LENGTH: 20, // 임시
+        MAX_CONTENT_LENGTH: 500, // 임시
     },
 
     NOTICE_COMMENT: {
-        MAX_COMMENT_COUNT_PER_POST: 10 // 임시
+        MAX_COMMENT_COUNT_PER_POST : 10, // 임시
+        MAX_COMMENT_CONTENT_LENGTH: 300, // 임시
     }
 }
