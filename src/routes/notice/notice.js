@@ -116,6 +116,7 @@ router.get("/:noticeId", loginAuth, async (req, res, next) => {
     };
 
     try {
+        validate(noticeId, "noticeId").checkInput().isNumber();
         // 게시물 조회
         const selectNoticeSql = `SELECT
                                         account_tb.id AS "authorId",
@@ -303,6 +304,8 @@ router.put("/", loginAuth, async (req, res, next) => {
 })
 
 // 공지 게시물 삭제
+// cascade 속성 걸려있어서 공지 게시물 삭제하면 이미지도 자동으로 삭제됨
+// 따라서 트랜잭션 걸필요 없음
 router.delete("/", loginAuth, async (req, res, next) => {
     const { noticeId } = req.body
     const userId = req.decoded.id
@@ -319,28 +322,37 @@ router.delete("/", loginAuth, async (req, res, next) => {
         pgClient = await pool.connect()
         await pgClient.query("BEGIN")
 
-        // 삭제 권한 체크
-        const selectPositionSql = `SELECT position
-            FROM club_member_tb
-            WHERE account_id = $1
-            AND club_id = (
-                SELECT notice_post_tb.club_id
-                FROM notice_post_tb
-                WHERE notice_post_tb.id = $2 
-            )`
-        const selectPositionParams = [userId, noticeId]
-        const selectPositionResult = await pgClient.query(selectPositionSql, selectPositionParams)
-
-        if (selectPositionResult.rowCount == 0) throw new BadRequestException("해당 동아리 부원이 아닙니다")
-        if (selectPositionResult.rows[0] >= 2) throw new BadRequestException("공지 게시물을 삭제할 권한이 없습니다")
-
+        const selectAuthSql = `SELECT
+                                    COALESCE(
+                                        (
+                                            SELECT
+                                                club_memeber_tb.position < 2
+                                            FROM
+                                                club_member_tb
+                                            WHERE
+                                                club_member_tb.account_id = $1
+                                            AND
+                                                club_member_tb.club_id = club_tb.id
+                                        )
+                                    , false) AS "manageAuth"
+                                FROM
+                                    notice_post_tb
+                                JOIN
+                                    club_tb
+                                ON
+                                    notice_post_tb.club_id = club_tb.id
+                                WHERE
+                                    notice_post_tb.id = $2`;
+        const selectAuthParam = [userId, noticeId]
+        const selectAuthResult = await pgClient.query(selectAuthSql, selectAuthParam)
+        if (selectAuthResult.rowCount === 0) throw new BadRequestException("해당하는 공지글이 존재하지 않습니다")
+        if (!selectAuthResult.rows[0].manageAuth) throw new BadRequestException("삭제 권한이 존재하지 않습니다");
         // 공지 게시물 삭제
         const deleteNoticeSql = `DELETE FROM notice_post_tb 
-            WHERE id = $2`
+            WHERE id = $1`
         const deleteNoticeParams = [noticeId]
         const deleteNoticeResult = await pgClient.query(deleteNoticeSql, deleteNoticeParams)
-
-        if (deleteNoticeResult == 0) throw new BadRequestException("일치하는 공지 게시물이 없습니다")
+        if (deleteNoticeResult === 0) throw new BadRequestException("일치하는 공지 게시물이 없습니다")
 
         // 이미지 삭제
         const deleteNoticeImgSql = `DELETE FROM notice_post_img_tb
