@@ -2,7 +2,6 @@
 class BadRequestException extends Error {
     constructor(message) {
         super(message);
-        this.name = "BadRequestException";
         this.status = 400;
     }
 }
@@ -11,7 +10,6 @@ class BadRequestException extends Error {
 class UnauthorizedException extends Error {
     constructor(message) {
         super(message);
-        this.name = "UnauthorizedException";
         this.status = 401;
     }
 }
@@ -20,7 +18,6 @@ class UnauthorizedException extends Error {
 class ForbbidenException extends Error {
     constructor(message) {
         super(message);
-        this.name = "ForbbidenException";
         this.status = 403;
     }
 }
@@ -29,7 +26,6 @@ class ForbbidenException extends Error {
 class NotFoundException extends Error {
     constructor(message) {
         super(message);
-        this.name = "NotFoundException";
         this.status = 404;
     }
 }
@@ -38,7 +34,6 @@ class NotFoundException extends Error {
 class InternerServerException extends Error {
     constructor() {
         super("서버에서 오류가 발생하였습니다");
-        this.name = "InternerServerException";
         this.status = 500;
     }
 }

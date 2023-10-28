@@ -1,3 +1,5 @@
+const { InternerServerException } = require("../module/customError");
+
 const errorHandling = () => {
     return (err, req, res, next) => {
         const result = {
@@ -8,9 +10,8 @@ const errorHandling = () => {
 
         // 500 error
         if (!err.status) {
-            err.status = 500;
-            result.message = "서버에서 오류가 발생하였습니다";
-            return res.status(err.status).send(result);
+            const serverError = new InternerServerException("서버에서 오류가 발생하였습니다");
+            return res.status(serverError.status).send(serverError.message);
         }
 
         return res.status(err.status).send(result);

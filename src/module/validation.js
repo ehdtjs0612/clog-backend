@@ -66,8 +66,7 @@ function Validation(input, name) {
     }
 
     this.setError = (message) => {
-        const error = new BadRequestException(`${name}: ${message}`);
-        throw error;
+        throw new BadRequestException(`${name}: ${message}`);
     }
 }
 

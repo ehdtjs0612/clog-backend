@@ -39,14 +39,12 @@ router.get("/list/club/:clubId", loginAuth, async (req, res, next) => {
                                     club_tb.id = $2`;
         const selectAuthParam = [userId, clubId];
         const selectAuthData = await pool.query(selectAuthSql, selectAuthParam);
-        console.log(selectAuthData.rows);
         if (selectAuthData.rowCount === 0) {
-            return next(new BadRequestException("존재하지 않는 동아리입니다."));
+            throw new BadRequestException("존재하지 않는 동아리입니다");
         }
         if (selectAuthData.rows[0].position === null) {
-            return next(new BadRequestException("동아리에 가입하지 않은 사용자입니다"));
+            throw new BadRequestException("동아리에 가입하지 않은 사용자입니다");
         }
-
         const offset = (page - 1) * POST.MAX_POST_COUNT_PER_PAGE;
         const selectAllPostCountSql = `SELECT 
                                             count(*)::int
