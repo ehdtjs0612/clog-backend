@@ -1,6 +1,7 @@
 const router = require("express").Router()
 const pool = require("../../../config/database/postgresql")
 const loginAuth = require("../../middleware/auth/loginAuth")
+const createNotification = require("../../module/createNotification")
 const validate = require("../../module/validation")
 const { NOTICE_COMMENT, POSITION } = require("../../module/global")
 const { BadRequestException } = require("../../module/customError")
@@ -39,9 +40,13 @@ router.post("/", loginAuth, async (req, res, next) => {
 
         // 공지 댓글 작성
         const insertCommentsql = `INSERT INTO notice_comment_tb (account_id, notice_post_id, content) 
-            VALUES ($1, $2, $3)`
+            VALUES ($1, $2, $3)
+            RETURNING notice_comment_tb.id`
         const insertCommentparams = [userId, noticeId, content]
-        await pgClient.query(insertCommentsql, insertCommentparams)
+        const insertCommentResult = await pgClient.query(insertCommentsql, insertCommentparams)
+        const notificationKey = insertCommentResult.rows[0].id
+
+        createNotification(req.originalUrl, notificationKey)
 
         await pgClient.query("COMMIT")
     } catch (error) {
@@ -107,6 +112,8 @@ router.put("/", loginAuth, async (req, res, next) => {
             WHERE notice_comment_tb.id = $2`
         const updateCommentParams = [content, commentId]
         await pgClient.query(updateCommentSql,updateCommentParams)
+
+        
 
         await pgClient.query("COMMIT")
     } catch (error) {

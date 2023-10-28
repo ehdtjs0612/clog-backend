@@ -132,7 +132,7 @@ const createNotification = async (url, key) => {
         selectedData.rows[index].type = type
         selectedData.rows[index].is_read = false
     }
-    console.log(selectedData.rows)
+    
     conn = await client.connect(process.env.MONGODB_URL)
 
     // 몽고디비에 저장
