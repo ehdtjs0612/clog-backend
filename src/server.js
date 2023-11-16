@@ -3,7 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const app = express();
 const cookieParser = require("cookie-parser");
-const redisClient = require("../config/database/redis");
+const redisClient = require("./config/database/redis");
 const cors = require("cors");
 
 // 로그

@@ -1,6 +1,6 @@
 const router = require("express").Router();
-const pool = require("../../../../config/database/postgresql");
-const loginAuth = require("../../../middleware/auth/loginAuth");
+const pool = require("../../../config/database/postgresql");
+const loginAuth = require("../../../middleware/loginAuth");
 const createNotification = require("../../../module/createNotification");
 const validate = require("../../../module/validation");
 const { NOTICE_COMMENT, MAX_PK_LENGTH, COMMENT } = require("../../../module/global");

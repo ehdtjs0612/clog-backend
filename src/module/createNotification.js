@@ -1,6 +1,6 @@
 require("dotenv").config()
 
-const pool = require("../../config/database/postgresql")
+const pool = require("../config/database/postgresql")
 const client = require("mongodb").MongoClient
 const { BadRequestException } = require("../module/customError")
 
